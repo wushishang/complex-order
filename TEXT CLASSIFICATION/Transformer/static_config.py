@@ -3,7 +3,7 @@ class Static_Config(object):
     d_model = 256 #512 in Transformer Paper
     d_ff = 512 #2048 in Transformer Paper
     data='TREC_transformer'
-    model='Transformer_wo'
+    model='Transformer_PE_reduce'
     h = 8
     dropout = 0.1
     output_size = 6

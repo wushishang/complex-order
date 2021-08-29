@@ -1,7 +1,8 @@
-# TODO: 1. Add control of random seeds for replication
+# TODO:
 #       2. Move helper functions here.
 #       3. Add config and customized file names
 # train.py
+import random
 
 from utils import *
 from static_config import Static_Config
@@ -10,7 +11,6 @@ import torch.optim as optim
 from torch import nn
 import torch
 import numpy as np
-from model_transformer import *
 from model_transformer.transformer_wo import Transformer_wo
 from model_transformer.PE_reduce import Transformer_PE_reduce
 from model_transformer.TPE_reduce import Transformer_TPE_reduce
@@ -20,12 +20,30 @@ from model_transformer.Complex_order import Transformer_Complex_order
 acc_flod=[]
 config = Static_Config()
 
-namedclass = {'Transformer_wo': Transformer_wo, 'PE_reduce': Transformer_PE_reduce,
+namedclass = {'Transformer_wo': Transformer_wo, 'Transformer_PE_reduce': Transformer_PE_reduce,
               'Transformer_TPE_reduce': Transformer_TPE_reduce,
               'Transformer_Complex_vanilla': Transformer_Complex_vanilla,
               'Transformer_Complex_order':Transformer_Complex_order}
 
+def set_seed(seed=1029):
+    """
+    Set seeds for reproducibility
+
+    Ref: https://github.com/pytorch/pytorch/issues/7068#issuecomment-484918113
+    """
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed) # if you are using multi-GPU.
+    # torch.backends.cudnn.benchmark = False
+    # torch.backends.cudnn.deterministic = True
+    # torch.backends.cudnn.enabled = False
+
 def dev_point_wise():
+    set_seed()
+
     train_file = "../data/" + config.data
     dataset = Dataset(config)
     dataset.load_data(train_file, config.data)
