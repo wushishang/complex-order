@@ -1,7 +1,7 @@
 # utils.py
 
 import torch
-from torchtext import data
+from torchtext.legacy import data
 import spacy
 import pandas as pd
 import numpy as np
@@ -28,16 +28,16 @@ class Dataset(object):
         full_df = pd.read_csv(filename, header=None, sep="\t", names=["text", "label"],encoding='gbk', quoting=3).fillna('N')
         return full_df
     
-    def load_data(self, train_file,dataset, val_file=None):
+    def load_data(self, train_file, dataset, val_file=None):
         
         if dataset=='sst2_transformer' or dataset=='TREC_transformer':
             print('no n fold cross validation')
         else:
             process(train_file)
 
-        NLP = spacy.load('en')
+        NLP = spacy.load('en_core_web_sm')
         tokenizer = lambda sent: [x.text for x in NLP.tokenizer(sent) if x.text != " "]
-        TEXT = data.Field(sequential=True, tokenize=tokenizer, lower=True, fix_length=self.config.max_sen_len)
+        TEXT = data.Field(sequential=True, tokenize=tokenizer, lower=True, fix_length=self.config.max_sen_len, include_lengths=True)
         LABEL = data.Field(sequential=False, use_vocab=False)
         datafields = [("text",TEXT),("label",LABEL)]
         
@@ -86,6 +86,7 @@ def clean_str_sst(string):
     string = re.sub(r"[^A-Za-z0-9(),!?\'\`]", " ", string)   
     string = re.sub(r"\s{2,}", " ", string)    
     return string.strip().lower()
+
 def clean_str(string):
     string = re.sub(r"[^A-Za-z0-9(),!?\'\`]", " ", string)
     string = re.sub(r"\'s", " \'s", string)
@@ -101,9 +102,10 @@ def clean_str(string):
     string = re.sub(r"\?", " \? ", string)
     string = re.sub(r"\s{2,}", " ", string)
     return string.strip().lower()
+
 def process(dataset):
     data_dir = "../data/" + dataset
-    root = os.path.join(data_dir,"rt-polaritydata")
+    root = os.path.join(data_dir, "rt-polaritydata")
     saved_path=data_dir
     if not os.path.exists(saved_path):
         os.makedirs(saved_path)
@@ -132,12 +134,23 @@ def evaluate_model(model, iterator):
     all_y = []
     for idx,batch in enumerate(iterator):
         if torch.cuda.is_available():
-            x = batch.text.cuda()
+            x = batch.text[0].cuda()
         else:
-            x = batch.text
+            x = batch.text[0]
         y_pred = model(x)
         predicted = torch.max(y_pred.cpu().data, 1)[1] + 1
         all_preds.extend(predicted.numpy())
         all_y.extend(batch.label.numpy())
     score = accuracy_score(all_y, np.array(all_preds).flatten())
     return score
+
+def get_pe_variance(pe_weight):
+    assert isinstance(pe_weight, torch.Tensor)
+    assert pe_weight.ndim == 2
+
+    pe_var = torch.var(pe_weight, dim=0)  # Var across 1st coordinate of each PE vector, 2nd coordinate, etc
+    pe_var = torch.sum(pe_var).item()  # Sum the variances: 1. interpretable, 2. valid if independent
+
+    norm = torch.norm(pe_weight).item()
+
+    return pe_var, norm

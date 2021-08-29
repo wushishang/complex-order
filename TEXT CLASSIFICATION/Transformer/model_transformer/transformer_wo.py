@@ -11,9 +11,9 @@ import numpy as np
 from utils import *
 
 
-class Transformer(nn.Module):
+class Transformer_wo(nn.Module):
     def __init__(self, config, src_vocab):
-        super(Transformer, self).__init__()
+        super(Transformer_wo, self).__init__()
         self.config = config
         
         h, N, dropout = self.config.h, self.config.N, self.config.dropout
@@ -33,7 +33,7 @@ class Transformer(nn.Module):
         self.softmax = nn.Softmax()
 
     def forward(self, x):
-        embedded_sents = self.src_embed(x.permute(1,0)) 
+        embedded_sents = self.src_embed(x.permute(1,0))
         encoded_sents = self.encoder(embedded_sents)
         
         final_feature_map = encoded_sents[:,-1,:]
@@ -62,10 +62,10 @@ class Transformer(nn.Module):
         for i, batch in enumerate(train_iterator):
             self.optimizer.zero_grad()
             if torch.cuda.is_available():
-                x = batch.text.cuda()
+                x = batch.text[0].cuda()
                 y = (batch.label - 1).type(torch.cuda.LongTensor)
             else:
-                x = batch.text
+                x = batch.text[0]
                 y = (batch.label - 1).type(torch.LongTensor)
             y_pred = self.__call__(x)
             loss = self.loss_op(y_pred, y)

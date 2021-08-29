@@ -1,4 +1,5 @@
 # Model.py
+import math
 
 import torch
 import torch.nn as nn
@@ -11,24 +12,30 @@ import numpy as np
 from utils import *
 from torch.autograd import Variable
 
+from utils import get_pe_variance
+
 
 class PositionalEncoding(nn.Module):
     "Implement the PE function."
     def __init__(self, d_model, dropout, max_len=5000):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
-        pe = torch.randn(max_len, d_model)
-        pe = pe.unsqueeze(0)
-        self.register_buffer('pe', pe)
+        self.pe = nn.Embedding(max_len, d_model)
+        self.d_model = d_model
+        self.count = 0
         
     def forward(self, x):
-        x = x + Variable(self.pe[:, :x.size(1)], 
-                         requires_grad=False)
+        # TODO: track PE
+        if self.count % 100 == 0:
+            print(get_pe_variance(self.pe.weight))
+        self.count += 1
+        pe = self.pe(torch.arange(x.size(1))) * math.sqrt(self.d_model)
+        x = torch.add(x, pe)
         return self.dropout(x)
 
-class Transformer(nn.Module):
+class Transformer_PE_reduce(nn.Module):
     def __init__(self, config, src_vocab):
-        super(Transformer, self).__init__()
+        super(Transformer_PE_reduce, self).__init__()
         self.config = config
         
         h, N, dropout = self.config.h, self.config.N, self.config.dropout
@@ -51,8 +58,10 @@ class Transformer(nn.Module):
     def forward(self, x):
         embedded_sents = self.src_embed(x.permute(1,0)) 
         encoded_sents = self.encoder(embedded_sents)
-        
-        final_feature_map = encoded_sents[:,-1,:]
+
+        # TODO: try other pooling func, e.g., mean/sum
+        # final_feature_map = encoded_sents[:,-1,:]
+        final_feature_map = torch.sum(encoded_sents, dim=1)
         final_out = self.fc(final_feature_map)
         return self.softmax(final_out)
     
@@ -78,10 +87,10 @@ class Transformer(nn.Module):
         for i, batch in enumerate(train_iterator):
             self.optimizer.zero_grad()
             if torch.cuda.is_available():
-                x = batch.text.cuda()
+                x = batch.text[0].cuda()
                 y = (batch.label - 1).type(torch.cuda.LongTensor)
             else:
-                x = batch.text
+                x = batch.text[0]
                 y = (batch.label - 1).type(torch.LongTensor)
             y_pred = self.__call__(x)
             loss = self.loss_op(y_pred, y)

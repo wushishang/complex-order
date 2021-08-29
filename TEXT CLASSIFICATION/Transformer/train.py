@@ -1,28 +1,36 @@
+# TODO: 1. Add control of random seeds for replication
+#       2. Move helper functions here.
+#       3. Add config and customized file names
 # train.py
 
 from utils import *
-from config import Config
+from static_config import Static_Config
 import sys
 import torch.optim as optim
 from torch import nn
 import torch
 import numpy as np
 from model_transformer import *
-# from model_transformer.transformer_wo import Transformer
-# from model_transformer.PE_reduce import Transformer
-# from model_transformer.TPE_reduce import Transformer
-# from model_transformer.Complex_vanilla import Transformer
-from model_transformer.Complex_order import Transformer
+from model_transformer.transformer_wo import Transformer_wo
+from model_transformer.PE_reduce import Transformer_PE_reduce
+from model_transformer.TPE_reduce import Transformer_TPE_reduce
+from model_transformer.Complex_vanilla import Transformer_Complex_vanilla
+from model_transformer.Complex_order import Transformer_Complex_order
 
 acc_flod=[]
+config = Static_Config()
 
-config = Config()
+namedclass = {'Transformer_wo': Transformer_wo, 'PE_reduce': Transformer_PE_reduce,
+              'Transformer_TPE_reduce': Transformer_TPE_reduce,
+              'Transformer_Complex_vanilla': Transformer_Complex_vanilla,
+              'Transformer_Complex_order':Transformer_Complex_order}
+
 def dev_point_wise():
     train_file = "../data/" + config.data
     dataset = Dataset(config)
-    dataset.load_data(train_file,config.data)
-    
-    model = Transformer(config, len(dataset.vocab))
+    dataset.load_data(train_file, config.data)
+
+    model = namedclass[config.model](config, len(dataset.vocab))
     n_all_param = sum([p.nelement() for p in model.parameters()])
     print('#params = {}'.format(n_all_param))
     if torch.cuda.is_available():
@@ -35,7 +43,7 @@ def dev_point_wise():
     
     train_losses = []
     val_accuracies = []
-    max_score=0.1
+    max_score = 0.1
     acc_max = 0.0000
     
     for i in range(config.max_epochs):

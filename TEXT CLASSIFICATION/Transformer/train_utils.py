@@ -18,6 +18,7 @@ def clones(module, N):
 
 
 class Embeddings(nn.Module):
+    # TODO: double-check the initialization
     '''
     Usual Embedding layer with weights multiplied by sqrt(d_model)
     '''

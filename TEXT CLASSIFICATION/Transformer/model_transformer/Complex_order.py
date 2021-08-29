@@ -28,9 +28,9 @@ def get_sinusoid_encoding_table(n_src_vocab, d_hid, padding_idx=None):
 
     return torch.FloatTensor(sinusoid_table)
 
-class Transformer(nn.Module):
+class Transformer_Complex_order(nn.Module):
     def __init__(self, config, src_vocab):
-        super(Transformer, self).__init__()
+        super(Transformer_Complex_order, self).__init__()
         self.config = config
         
         h, N, dropout = self.config.h, self.config.N, self.config.dropout

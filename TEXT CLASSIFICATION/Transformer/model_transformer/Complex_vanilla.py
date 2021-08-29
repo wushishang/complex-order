@@ -12,9 +12,9 @@ from utils import *
 import math
 from torch.nn.parameter import Parameter
 
-class Transformer(nn.Module):
+class Transformer_Complex_vanilla(nn.Module):
     def __init__(self, config, src_vocab):
-        super(Transformer, self).__init__()
+        super(Transformer_Complex_vanilla, self).__init__()
         self.config = config
         
         h, N, dropout = self.config.h, self.config.N, self.config.dropout

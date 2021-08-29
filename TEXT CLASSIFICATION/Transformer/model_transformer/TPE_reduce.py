@@ -31,9 +31,9 @@ class PositionalEncoding(nn.Module):
         x = x + Variable(self.pe[:, :x.size(1)],requires_grad=True)
         return self.dropout(x)
 
-class Transformer(nn.Module):
+class Transformer_TPE_reduce(nn.Module):
     def __init__(self, config, src_vocab):
-        super(Transformer, self).__init__()
+        super(Transformer_TPE_reduce, self).__init__()
         self.config = config
         
         h, N, dropout = self.config.h, self.config.N, self.config.dropout
