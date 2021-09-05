@@ -1,12 +1,13 @@
 from itertools import chain, combinations
 import numpy
 
-PS_TRANSFORMER_SIX_TASKS = True
+TRANSFORMER_TWO_TASKS = False
+PI_TRANSFORMER_HP_TUNING = True
 
 SYNTAX_CHECK = True
 DRYRUN = False
 
-EXP_DATE = "_sept_1_2021" # "_apr_10"
+EXP_DATE = "_sept_4_2021" # "_apr_10"
 QUEUE_NAME = "RP_REG_wu1396_ml00" + EXP_DATE # "RP_REG_wu1396_bell"
 SRC_FOLDER = "complex-order" + EXP_DATE + "/TEXT_CLASSIFICATION/Transformer" # "rpgin_reg_mar_27"
 PYTHON_MAINFILE = "train.py"
@@ -33,7 +34,7 @@ def _get_command_tuple(base_args, arg_dict, binary_flags=()):
     return src_dir, cmd, op_file, arg_dict
 
 
-if PS_TRANSFORMER_SIX_TASKS:
+if TRANSFORMER_TWO_TASKS:
 
     # data config
     data = ""
@@ -51,6 +52,34 @@ if PS_TRANSFORMER_SIX_TASKS:
         for _data in ['TREC_transformer', 'sst2_transformer']  #  'cr', 'mpqa', 'mr', 'subj'
         for _trans_pt in ['none', 'ape']
         for _trans_pl in ['sum', 'max']  # 'last_dim',
+        for _sv in range(133337, 133347)
+
+        # for _bf in powerset(binary_flags)
+    ]
+
+elif PI_TRANSFORMER_HP_TUNING:
+
+    # data config
+    data = ""
+
+    # model_config
+    model = "-mt Transformer "
+
+    # training config
+    train = ""
+
+    # binary_flags = ["use_batchnorm"]  # "use_mini_batching -bs 32"
+
+    TASKS = [
+        _get_command_tuple(data + model + train, {"data": _data, "ne":_ne, "lr": _lr, "bs": _bs, "trans_pt": _trans_pt,
+                                                  "trans_pl": _trans_pl, "trans_dp": _trans_dp,  "sv":_sv})
+        for _data in ['TREC_transformer']  # , 'sst2_transformer', 'cr', 'mpqa', 'mr', 'subj'
+        for _ne in [400]  # 200, 400, 800
+        for _lr in [0.001, 0.0001, 0.00001]
+        for _bs in [32, 64, 128]
+        for _trans_pt in ['none']
+        for _trans_pl in ['last_dim']
+        for _trans_dp in [0., 0.1, 0.5]
         for _sv in range(133337, 133347)
 
         # for _bf in powerset(binary_flags)

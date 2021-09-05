@@ -33,11 +33,15 @@ class TC_ExperimentData(Enum):
     subj = 6
 
 
-TC_OutputSize = {TC_ExperimentData.TREC_transformer: 6, TC_ExperimentData.sst2_transformer: 2}
-    # cr = 3
-    # mpqa = 4
-    # mr = 5
-    # subj = 6
+TC_OutputSize = {TC_ExperimentData.TREC_transformer: 6, TC_ExperimentData.sst2_transformer: 2,
+                 TC_ExperimentData.cr: 2, TC_ExperimentData.mpqa: 2,
+                 TC_ExperimentData.mr: 2, TC_ExperimentData.subj: 2}
+
+# Maximum length of sentences in the training set of TREC and SST-2 (following the original code)
+# Maximum length of sentences in the whole dataset of CR, MPQA, MR, SUBJ
+MaxSenLen = {TC_ExperimentData.TREC_transformer: 53, TC_ExperimentData.sst2_transformer: 37}
+                 # TC_ExperimentData.cr: 2, TC_ExperimentData.mpqa: 2,
+                 # TC_ExperimentData.mr: 2, TC_ExperimentData.subj: 2}
 
 
 class Activation(Enum):

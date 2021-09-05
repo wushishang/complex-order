@@ -9,11 +9,9 @@ from attention import MultiHeadedAttention
 from encoder import EncoderLayer, Encoder
 from feed_forward import PositionwiseFeedForward
 import numpy as np
-from utils import *
-from torch.autograd import Variable
 
-from utils import get_pe_variance
 from util.constants import TC_OutputSize
+from utils import *
 
 
 class PositionalEncoding(nn.Module):
@@ -54,11 +52,9 @@ class Transformer_PE_reduce(nn.Module):
         self.max_epochs = config.num_epochs
 
     def forward(self, x):
-        embedded_sents = self.src_embed(x.permute(1,0)) 
+        embedded_sents = self.src_embed(x.permute(1,0))
         encoded_sents = self.encoder(embedded_sents)
 
-        # TODO: try other pooling func, e.g., mean/sum
-        # final_feature_map = encoded_sents[:,-1,:]
         assert encoded_sents.ndim == 3
         final_feature_map = self.pool(encoded_sents)
         final_out = self.fc(final_feature_map)

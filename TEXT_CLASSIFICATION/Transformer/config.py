@@ -13,7 +13,7 @@ from configs.model_config import ModelArgParser
 from configs.transformer_config import TransformerArgParser
 from my_common.my_helper import enum_sprint, is_positive_int
 # from scalings import Scalings
-from util.constants import TC_ExperimentData, TC_ModelType, Constants
+from util.constants import TC_ExperimentData, TC_ModelType, Constants, MaxSenLen
 
 RESULT_DIR = "./results/"
 MODEL_DIR = "./model_save/"
@@ -47,7 +47,7 @@ class Config:
 
         parser.add_argument('-data', '--experiment_data', required=True, type=str,
                             help=f'Data for experiment: {enum_sprint(TC_ExperimentData)}')
-        parser.add_argument('-msl', '--max_sen_len', default=53, type=int,
+        parser.add_argument('-msl', '--max_sen_len', default=0, type=int,
                             help='Maximum length of sentences')
 
         ##########
@@ -201,11 +201,16 @@ class Config:
         # Parameters for data and model types
         # ===================================================
         self.experiment_data = TC_ExperimentData[str(args.experiment_data)]
-        assert is_positive_int(args.max_sen_len)
-        self.max_sen_len = args.max_sen_len
         print_stats("-" * 10)
         print_stats(f"Experiment data: {self.experiment_data.name}")
         print_stats("-" * 10)
+
+        assert isinstance(args.max_sen_len, int)
+        if args.max_sen_len > 0:
+            self.max_sen_len = args.max_sen_len
+        elif args.max_sen_len == 0:
+            self.max_sen_len = MaxSenLen[self.experiment_data]
+            print_stats(f"Specified max_sen_len is 0. Reset to max_sen_len of training samples of {self.experiment_data.name}.")
 
 #         # ===================================================
 #         # Parameters for data and model types

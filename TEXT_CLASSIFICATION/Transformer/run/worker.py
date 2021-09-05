@@ -63,7 +63,7 @@ GPU_SPEC = {
     M.GILBRETH: [0, 1],
 }
 RUNNING = "RUNNING"
-MAX_WALL_CLOCK_TIME = 76300
+MAX_WALL_CLOCK_TIME = 82800
 
 
 def command_runner(c):

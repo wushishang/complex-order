@@ -67,7 +67,7 @@ class TransformerArgParser(ModelArgParser):
 
         for _var in [self.trans_num_layers, self.trans_dim_model, self.trans_dim_ff, self.trans_num_heads]:
             assert is_positive_int(_var)
-        assert isinstance(self.trans_dropout, float) and self.trans_dropout > 0
+        assert isinstance(self.trans_dropout, float) and self.trans_dropout >= 0
         assert isinstance(self.trans_layer_norm, bool)
 
 
