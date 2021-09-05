@@ -1,0 +1,16 @@
+#!/bin/bash
+#SBATCH -A statdept
+#SBATCH -t 24:00:00
+#SBATCH --job-name=worker
+#SBATCH -o worker_%A_%a.out
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+
+echo "$HOSTNAME"
+echo "$SLURM_JOB_NODELIST"
+
+srun python -u $PYTHON_FILE instantiate_workers --start 0 --procs $N_PROCS --single --cluster --gpu_spec "0"
+
+##########
+# sbatch --export=ALL,PYTHON_FILE=run_experiments.py,N_PROCS=4 run/run_cluster.sub
+# sbatch --array=0-30%6 --export=ALL,MKL_THREADING_LAYER=GNU,MKL_NUM_THREADS=1,PYTHON_FILE=run_experiments.py,N_PROCS=1 run/run_cluster.sub
