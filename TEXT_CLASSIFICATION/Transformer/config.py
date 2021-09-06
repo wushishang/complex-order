@@ -59,6 +59,8 @@ class Config:
         ##########
         # PARAMETERS THAT CONTROL TRAINING AND EVALUATION
         ##########
+        parser.add_argument('-ori', '--original_mode', action='store_true', help="Simulate (the bugs in) the original "
+                            "code, including fixed PE, wrongly used .train() and .eval()")
         parser.add_argument('-lr', '--learning_rate', default=0.00001, type=float, help='Learning rate for Adam Optimizer')
         parser.add_argument('-ne', '--num_epochs', default=100, type=int,
                             help='Number of epochs for training at a maximum')
@@ -226,6 +228,8 @@ class Config:
 #             self.data_cfg = self.parsed_to_cfg(args, GraphDataArgParser)
 #         else:
 #             raise NotImplementedError(f"Unable to handle {self.input_type} yet.")
+
+        self.original_mode = args.original_mode
 #
         if self.model_type == TC_ModelType.transformer:
             self.model_cfg = self.parsed_to_cfg(args, TransformerArgParser)
@@ -591,7 +595,7 @@ class Config:
         """
         Return Training Information
         """
-        train_params = [self.learning_rate, self.num_epochs, self.seed_val, self.batch_size]
+        train_params = [self.original_mode, self.learning_rate, self.num_epochs, self.seed_val, self.batch_size]
 #         train_params = [self.permute_for_pi_sgd, self.permute_positional_encoding, self.learning_rate,
 #                         self.patience_increase, self.seed_val, self.num_epochs, self.num_inf_perm, self.eval_interval,
 #                         self.eval_train, self.shuffle_batches]

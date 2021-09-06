@@ -11,7 +11,7 @@ import numpy as np
 
 from common.helper import log_stats, Util, print_stats
 from common.json_dump import JsonDump
-from util.constants import TC_ExperimentData
+from util.constants import TC_ExperimentData, MaxSenLen
 from utils import *
 from config import Config
 # from static_config import Static_Config
@@ -58,7 +58,7 @@ class Train:
 
     @classmethod
     def get_model(cls, cfg, dataset, logger_stats):
-        model = namedclass[cfg.model_cfg.get_class_name()](cfg, len(dataset.vocab))
+        model = namedclass[cfg.model_cfg.get_class_name()](cfg, len(dataset.vocab), MaxSenLen[cfg.experiment_data])
         n_all_param = sum([p.nelement() for p in model.parameters()])
         log_stats(logger_stats, 'Model specifications:', num_params=n_all_param)
         if torch.cuda.is_available():
@@ -86,6 +86,14 @@ class Train:
                 best_model_dict = None
             optimizer.load_state_dict(state_dict['optimizer'])
             best_val_metric = state_dict['best_val_metric']
+            if state_dict['best_pe_variance'] is not None:
+                best_pe_variance = state_dict['best_pe_variance']
+            else:
+                best_pe_variance = None
+            if state_dict['best_pe_norm'] is not None:
+                best_pe_norm = state_dict['best_pe_norm']
+            else:
+                best_pe_norm = None
             # patience = state_dict['patience']
             # patience_increase = state_dict['patience_increase']
             epoch = state_dict['epoch']
@@ -101,13 +109,15 @@ class Train:
             best_model_dict = None
             # patience = cfg.num_epochs  # look as these many epochs
             # patience_increase = cfg.patience_increase  # wait these many epochs longer once validation error stops reducing
+            best_pe_variance, best_pe_norm = None, None
             epoch = -1
             best_epoch = -1
             training_time = 0
             log_stats(logger_stats, "starting_optimization",
                       best_val_metric=best_val_metric,  # patience=patience, patience_increase=patience_increase,
                       epoch=epoch, training_time=0)
-        return model, best_model_dict, optimizer, best_val_metric, epoch, best_epoch, training_time  # patience, patience_increase,
+        return model, best_model_dict, optimizer, best_val_metric, best_pe_variance, best_pe_norm,\
+               epoch, best_epoch, training_time  # patience, patience_increase,
 
     @classmethod
     def dev_point_wise(cls, cfg, logger_stats, epoch_stats):
@@ -121,20 +131,22 @@ class Train:
 
         # Initialize model
         model = cls.get_model(cfg, dataset, logger_stats)
+        if cfg.original_mode:
+            model.train()
         optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate)
         NLLLoss = nn.CrossEntropyLoss()
         # model.add_optimizer(optimizer)
         model.add_loss_op(NLLLoss)
         best_model = copy.deepcopy(model)  # will load the final state at the end of training for model evaluation
 
-        model, best_model_dict, optimizer, best_val_metric \
+        model, best_model_dict, optimizer, best_val_metric, best_pe_variance, best_pe_norm \
             , epoch, best_epoch, training_time = cls.load_state(cfg, model, optimizer, logger_stats)
 
         # train_losses = []
         # max_score = 0.1
 
         # TODO: 1. Save checkpoint for continued training and evaluation (finished)
-        #       2. Add the original mode (fixed PE)
+        #       2. Add the original mode (fixed PE, incorrect use of .train() and .eval()) (finished)
         #       3. Add regularization
         #       4. Add different orderings for testing
         #       5. Merge PE_reduce and wo
@@ -151,24 +163,30 @@ class Train:
                 training_time += epoch_time
 
                 # train_losses.append(train_loss)
-                train_acc = evaluate_model(model, dataset.train_iterator)
-                val_acc = evaluate_model(model, dataset.val_iterator)
+                train_acc = evaluate_model(model, dataset.train_iterator, not cfg.original_mode)
+                val_acc = evaluate_model(model, dataset.val_iterator, not cfg.original_mode)
                 _es = Util.dictize(epoch=epoch
                                    , loss_train=float(np.mean(np.array(train_loss)))
                                    , acc_train=train_acc
                                    , acc_val=val_acc)
                 if isinstance(model, Transformer_PE_reduce):
-                    _es['pe_variance'], _es['pe_norm'] = get_pe_variance(model.src_embed[1].pe.weight)
+                    _es['pe_variance'], _es['pe_norm'] = get_pe_variance(model.src_embed[1].pe,
+                                                                         cfg.original_mode,
+                                                                         MaxSenLen[cfg.experiment_data])
 
                 if val_acc > best_val_metric:
                     best_val_metric = val_acc
                     best_epoch = epoch
                     if isinstance(model, Transformer_PE_reduce):
                         # FIXME: only track PE up to max_sen_len
-                        _es['best_pe_variance'], _es['best_pe_norm'] = _es['pe_variance'], _es['pe_norm']
+                        best_pe_variance, best_pe_norm = _es['pe_variance'], _es['pe_norm']
                     # Save Weights
                     best_model_dict = model.state_dict()
                     log_stats(logger_stats, "saving_model_checkpoint", epoch=epoch)
+
+                if isinstance(model, Transformer_PE_reduce):
+                    _es['best_pe_variance'], _es['best_pe_norm'] = best_pe_variance, best_pe_norm
+
                 _es.update(Util.dictize(best_val_metric=best_val_metric, best_epoch=best_epoch))
 
                 epoch_stats.add(**_es)
@@ -176,7 +194,8 @@ class Train:
                 torch.save(Util.dictize(
                     model=model.state_dict(), best_model=best_model_dict if best_model_dict is not None else None,
                     optimizer=optimizer.state_dict(), best_val_metric=best_val_metric,
-                    epoch=epoch, best_epoch=best_epoch, training_time=training_time
+                    epoch=epoch, best_epoch=best_epoch, best_pe_variance=best_pe_variance, best_pe_norm=best_pe_norm,
+                    training_time=training_time
                 ), cfg.checkpoint_file_name())
 
         if best_model_dict is None:
@@ -199,11 +218,13 @@ class Train:
             train_file = "../data/" + cfg.experiment_data.name
             dataset = Dataset(cfg)
             dataset.load_data(train_file, cfg.experiment_data.name)
-            test_acc = evaluate_model(best_model, dataset.test_iterator)
+            test_acc = evaluate_model(best_model, dataset.test_iterator, not cfg.original_mode)
             print('Final Test Accuracy: {:.4f}'.format(test_acc))
             _es_test = {'test_acc': test_acc}
             if isinstance(best_model, Transformer_PE_reduce):
-                _es_test['best_pe_variance'], _es_test['best_pe_norm'] = get_pe_variance(best_model.src_embed[1].pe.weight)
+                _es_test['best_pe_variance'], _es_test['best_pe_norm'] = get_pe_variance(best_model.src_embed[1].pe,
+                                                                                         cfg.original_mode,
+                                                                                         MaxSenLen[cfg.experiment_data])
             output_stats.add(**_es_test)
         else:
             acc_flod = []

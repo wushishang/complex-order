@@ -14,7 +14,7 @@ from utils import *
 
 
 class Transformer_wo(nn.Module):
-    def __init__(self, config, src_vocab):
+    def __init__(self, config, src_vocab, max_len=5000):
         super(Transformer_wo, self).__init__()
 
         h, N, dropout = config.model_cfg.trans_num_heads, config.model_cfg.trans_num_layers, config.model_cfg.trans_dropout
@@ -35,6 +35,7 @@ class Transformer_wo(nn.Module):
         self.softmax = nn.Softmax(dim=1)
 
         self.max_epochs = config.num_epochs
+        self.original_mode = config.original_mode
 
     def forward(self, x):
         embedded_sents = self.src_embed(x.permute(1,0))
@@ -64,7 +65,9 @@ class Transformer_wo(nn.Module):
         if (epoch == int(self.max_epochs / 3)) or (epoch == int(2 * self.max_epochs / 3)):
             self.reduce_lr(optimizer)
 
-        self.train()
+        if not self.original_mode:
+            self.train()
+
         for i, batch in enumerate(train_iterator):
             optimizer.zero_grad()
             if torch.cuda.is_available():
@@ -78,5 +81,7 @@ class Transformer_wo(nn.Module):
             loss.backward()
             train_losses.append(loss.data.cpu().numpy())
             optimizer.step()
+            if self.original_mode:
+                self.train()
 
         return train_losses, val_accuracies

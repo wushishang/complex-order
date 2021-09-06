@@ -10,6 +10,9 @@ import pandas as pd
 import os 
 import re
 
+from my_common.my_helper import is_positive_int
+
+
 class Dataset(object):
     def __init__(self, config):
         self.config = config
@@ -129,8 +132,9 @@ def process(dataset):
     dev[["text","label"]].to_csv(test_filename,encoding="utf-8",sep="\t",index=False,header=None)
     print("processing into formated files over")
 
-def evaluate_model(model, iterator):
-    model.eval()
+def evaluate_model(model, iterator, eval=True):
+    if eval:
+        model.eval()
     all_preds = []
     all_y = []
     for idx,batch in enumerate(iterator):
@@ -145,13 +149,21 @@ def evaluate_model(model, iterator):
     score = accuracy_score(all_y, np.array(all_preds).flatten())
     return score
 
-def get_pe_variance(pe_weight):
+def get_pe_variance(pe, original_mode=False, max_len=None):
+    assert isinstance(original_mode, bool)
+    if not original_mode:
+        pe_weight = pe.weight.detach()  # pe is torch.Embedding()
+    else:
+        pe_weight = pe.detach().squeeze(0)  # pe is torch.randn() with first dim unsqueezed
+
     assert isinstance(pe_weight, torch.Tensor)
     assert pe_weight.ndim == 2
+    if original_mode:
+        assert is_positive_int(max_len)
+        pe_weight = pe_weight[:max_len]
 
     pe_var = torch.var(pe_weight, dim=0)  # Var across 1st coordinate of each PE vector, 2nd coordinate, etc
     pe_var = torch.sum(pe_var).item()  # Sum the variances: 1. interpretable, 2. valid if independent
-
     norm = torch.norm(pe_weight).item()
 
     return pe_var, norm

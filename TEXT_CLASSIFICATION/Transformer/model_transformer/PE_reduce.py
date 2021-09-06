@@ -9,26 +9,38 @@ from attention import MultiHeadedAttention
 from encoder import EncoderLayer, Encoder
 from feed_forward import PositionwiseFeedForward
 import numpy as np
+from torch.autograd import Variable
 
-from util.constants import TC_OutputSize
+from util.constants import TC_OutputSize, Constants
 from utils import *
 
 
 class PositionalEncoding(nn.Module):
     "Implement the PE function."
-    def __init__(self, d_model, dropout, max_len=5000):
+    def __init__(self, d_model, dropout, max_len, original_mode=False):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
-        self.pe = nn.Embedding(max_len, d_model)
         self.d_model = d_model
+        self.original_mode = original_mode
+        if self.original_mode:
+            pe = torch.randn(Constants.ORIGINAL_MAX_PE_LEN, d_model)
+            pe = pe.unsqueeze(0)
+            self.register_buffer('pe', pe)
+        else:
+            self.pe = nn.Embedding(max_len, d_model)
+            self.positions = torch.arange(max_len)
         
     def forward(self, x):
-        pe = self.pe(torch.arange(x.size(1), device=self.pe.weight.device)) * math.sqrt(self.d_model)
-        x = torch.add(x, pe)
+        if self.original_mode:
+            x = x + Variable(self.pe[:, :x.size(1)], requires_grad=False)
+        else:
+            assert int(x.size(1)) == len(self.positions)
+            pe = self.pe(self.positions) * math.sqrt(self.d_model)
+            x = torch.add(x, pe)
         return self.dropout(x)
 
 class Transformer_PE_reduce(nn.Module):
-    def __init__(self, config, src_vocab):
+    def __init__(self, config, src_vocab, max_len=5000):
         super(Transformer_PE_reduce, self).__init__()
         
         h, N, dropout = config.model_cfg.trans_num_heads, config.model_cfg.trans_num_layers, config.model_cfg.trans_dropout
@@ -36,7 +48,7 @@ class Transformer_PE_reduce(nn.Module):
         
         attn = MultiHeadedAttention(h, d_model)
         ff = PositionwiseFeedForward(d_model, d_ff, dropout)
-        position = PositionalEncoding(d_model, dropout)
+        position = PositionalEncoding(d_model, dropout, max_len=max_len, original_mode=config.original_mode)
         
         self.encoder = Encoder(EncoderLayer(config.model_cfg.trans_dim_model, deepcopy(attn), deepcopy(ff), dropout), N)
         self.src_embed = nn.Sequential(Embeddings(config.model_cfg.trans_dim_model, src_vocab), deepcopy(position))
@@ -50,6 +62,7 @@ class Transformer_PE_reduce(nn.Module):
         self.softmax = nn.Softmax(dim=1)
 
         self.max_epochs = config.num_epochs
+        self.original_mode = config.original_mode
 
     def forward(self, x):
         embedded_sents = self.src_embed(x.permute(1,0))
@@ -79,7 +92,9 @@ class Transformer_PE_reduce(nn.Module):
         if (epoch == int(self.max_epochs/3)) or (epoch == int(2*self.max_epochs/3)):
             self.reduce_lr(optimizer)
 
-        self.train()
+        if not self.original_mode:
+            self.train()
+
         for i, batch in enumerate(train_iterator):
             optimizer.zero_grad()
             if torch.cuda.is_available():
@@ -93,5 +108,7 @@ class Transformer_PE_reduce(nn.Module):
             loss.backward()
             train_losses.append(loss.data.cpu().numpy())
             optimizer.step()
+            if self.original_mode:
+                self.train()
                 
         return train_losses, val_accuracies

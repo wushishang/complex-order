@@ -278,6 +278,8 @@ class Aggregation(Enum):
 
 
 class Constants:
+    ORIGINAL_MAX_PE_LEN = 5000  # max_len used in original code of PE_reduce
+
     # Word embedding and positional embedding standard dev
     # From https://github.com/pytorch/fairseq/blob/master/fairseq/models/fconv.py
     WP_EMBEDDING_STD = 0.1
