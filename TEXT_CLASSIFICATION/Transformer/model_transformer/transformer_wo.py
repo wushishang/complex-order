@@ -51,21 +51,22 @@ class Transformer_wo(nn.Module):
     def add_loss_op(self, loss_op):
         self.loss_op = loss_op
     
-    def reduce_lr(self):
+    def reduce_lr(self, optimizer):
         print("Reducing LR")
-        for g in self.optimizer.param_groups:
+        for g in optimizer.param_groups:
             g['lr'] = g['lr'] / 2
-                
-    def run_epoch(self, train_iterator, val_iterator, epoch):
+
+    def run_epoch(self, train_iterator, epoch, optimizer):
         train_losses = []
         val_accuracies = []
         # losses = []
-        
-        if (epoch == int(self.max_epochs/3)) or (epoch == int(2*self.max_epochs/3)):
-            self.reduce_lr()
-            
+
+        if (epoch == int(self.max_epochs / 3)) or (epoch == int(2 * self.max_epochs / 3)):
+            self.reduce_lr(optimizer)
+
+        self.train()
         for i, batch in enumerate(train_iterator):
-            self.optimizer.zero_grad()
+            optimizer.zero_grad()
             if torch.cuda.is_available():
                 x = batch.text[0].cuda()
                 y = (batch.label - 1).type(torch.cuda.LongTensor)
@@ -76,7 +77,6 @@ class Transformer_wo(nn.Module):
             loss = self.loss_op(y_pred, y)
             loss.backward()
             train_losses.append(loss.data.cpu().numpy())
-            self.optimizer.step()
-            self.train()                
-                
+            optimizer.step()
+
         return train_losses, val_accuracies

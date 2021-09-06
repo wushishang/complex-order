@@ -130,6 +130,7 @@ def process(dataset):
     print("processing into formated files over")
 
 def evaluate_model(model, iterator):
+    model.eval()
     all_preds = []
     all_y = []
     for idx,batch in enumerate(iterator):

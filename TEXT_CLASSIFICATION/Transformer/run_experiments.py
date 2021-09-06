@@ -2,12 +2,12 @@ from itertools import chain, combinations
 import numpy
 
 TRANSFORMER_TWO_TASKS = False
-PI_TRANSFORMER_HP_TUNING = True
+PI_TRANSFORMER_HP_TUNING = False
 
 SYNTAX_CHECK = True
-DRYRUN = False
+DRYRUN = True
 
-EXP_DATE = "_sept_4_2021" # "_apr_10"
+EXP_DATE = "_sept_5_2021" # "_apr_10"
 QUEUE_NAME = "RP_REG_wu1396_ml00" + EXP_DATE # "RP_REG_wu1396_bell"
 SRC_FOLDER = "complex-order" + EXP_DATE + "/TEXT_CLASSIFICATION/Transformer" # "rpgin_reg_mar_27"
 PYTHON_MAINFILE = "train.py"
@@ -57,6 +57,7 @@ if TRANSFORMER_TWO_TASKS:
         # for _bf in powerset(binary_flags)
     ]
 
+
 elif PI_TRANSFORMER_HP_TUNING:
 
     # data config
@@ -73,8 +74,8 @@ elif PI_TRANSFORMER_HP_TUNING:
     TASKS = [
         _get_command_tuple(data + model + train, {"data": _data, "ne":_ne, "lr": _lr, "bs": _bs, "trans_pt": _trans_pt,
                                                   "trans_pl": _trans_pl, "trans_dp": _trans_dp,  "sv":_sv})
-        for _data in ['TREC_transformer']  # , 'sst2_transformer', 'cr', 'mpqa', 'mr', 'subj'
-        for _ne in [400]  # 200, 400, 800
+        for _data in ['sst2_transformer']  # , 'TREC_transformer', 'cr', 'mpqa', 'mr', 'subj'
+        for _ne in [400]  # 100, 200, 800
         for _lr in [0.001, 0.0001, 0.00001]
         for _bs in [32, 64, 128]
         for _trans_pt in ['none']
@@ -84,6 +85,36 @@ elif PI_TRANSFORMER_HP_TUNING:
 
         # for _bf in powerset(binary_flags)
     ]
+
+
+elif SYNTAX_CHECK:
+
+    # data config
+    data = ""
+
+    # model_config
+    model = "-mt Transformer "
+
+    # training config
+    train = ""
+
+    # binary_flags = ["use_batchnorm"]  # "use_mini_batching -bs 32"
+
+    TASKS = [
+        _get_command_tuple(data + model + train, {"data": _data, "ne":_ne, "lr": _lr, "bs": _bs, "trans_pt": _trans_pt,
+                                                  "trans_pl": _trans_pl, "trans_dp": _trans_dp,  "sv":_sv})
+        for _data in ['TREC_transformer']  # , 'sst2_transformer', 'cr', 'mpqa', 'mr', 'subj'
+        for _ne in [4]  # 100, 200, 800
+        for _lr in [0.0001]  #0.001, 0.00001
+        for _bs in [64]  # 32, 128
+        for _trans_pt in ['none', 'ape']
+        for _trans_pl in ['last_dim']  # , 'sum', 'max'
+        for _trans_dp in [0.1]  # 0., 0.5
+        for _sv in [778]
+
+        # for _bf in powerset(binary_flags)
+    ]
+
 
 if __name__ == '__main__':
     print(TASKS)
