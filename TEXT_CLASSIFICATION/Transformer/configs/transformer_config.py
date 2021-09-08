@@ -20,6 +20,8 @@ class TransformerArgParser(ModelArgParser):
         # Positional encoding
         group.add_argument('-trans_pt', '--trans_pe_type', type=str, default='ape',
                            help=f"Type of PE used by Transformer. One of {enum_sprint(PE_Type)}")
+        group.add_argument('--trans_small_pe', default=False, action='store_true',
+                           help="Use a relatively small PE (compared to word embeddings) by removing the scaling factor.")
         # Pooling function
         group.add_argument('-trans_pl', '--trans_pooling', type=str, default='last_dim',
                            help=f"Type of pooling function. One of {enum_sprint(Pooling)}")
@@ -43,6 +45,7 @@ class TransformerArgParser(ModelArgParser):
                            default=0.1,
                            help="Dropout probability")
         # Layer Normalization (using default from the 'complex order' paper)
+        # FIXME: this argument takes no effect right now
         group.add_argument('--trans_dont_use_layer_norm', default=False, action='store_true',
                            help="Do not use layer normalization")
 
@@ -57,6 +60,7 @@ class TransformerArgParser(ModelArgParser):
         """ Set params that control model """
 
         self.trans_pe_type = PE_Type[args.trans_pe_type.lower()]
+        self.trans_small_pe = args.trans_small_pe
         self.trans_pooling = Pooling[args.trans_pooling.lower()]
         self.trans_num_layers = args.trans_num_layers
         self.trans_dim_model = args.trans_dim_model
@@ -69,11 +73,13 @@ class TransformerArgParser(ModelArgParser):
             assert is_positive_int(_var)
         assert isinstance(self.trans_dropout, float) and self.trans_dropout >= 0
         assert isinstance(self.trans_layer_norm, bool)
+        if self.trans_small_pe:
+            assert self.trans_pe_type != PE_Type.none
 
 
     def get_model_id_list(self):
-        _lst = [self.trans_pe_type.name, self.trans_pooling.name, self.trans_num_layers, self.trans_dim_model, self.trans_dim_ff,
-                self.trans_num_heads, self.trans_dropout, self.trans_layer_norm]
+        _lst = [self.trans_pe_type.name, self.trans_small_pe, self.trans_pooling.name, self.trans_num_layers,
+                self.trans_dim_model, self.trans_dim_ff, self.trans_num_heads, self.trans_dropout, self.trans_layer_norm]
 
         return self.add_additional_id_info(_lst)
 
