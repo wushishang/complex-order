@@ -13,6 +13,7 @@ from torch.autograd import Variable
 
 from util.constants import TC_OutputSize, Constants
 from utils import *
+from common.torch_util import TorchUtil as tu
 
 
 class PositionalEncoding(nn.Module):
@@ -28,7 +29,7 @@ class PositionalEncoding(nn.Module):
             self.register_buffer('pe', pe)
         else:
             self.pe = nn.Embedding(max_len, d_model)
-            self.positions = torch.arange(max_len)
+            self.positions = tu.move(torch.arange(max_len))
         
     def forward(self, x):
         if self.original_mode:
