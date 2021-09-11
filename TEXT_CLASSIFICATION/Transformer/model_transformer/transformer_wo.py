@@ -46,9 +46,9 @@ class Transformer_wo(nn.Module):
         final_out = self.fc(final_feature_map)
         return self.softmax(final_out)
     
-    def add_optimizer(self, optimizer):
-        self.optimizer = optimizer
-        
+    # def add_optimizer(self, optimizer):
+    #     self.optimizer = optimizer
+
     def add_loss_op(self, loss_op):
         self.loss_op = loss_op
     

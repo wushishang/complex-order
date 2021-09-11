@@ -84,10 +84,8 @@ class TransformerArgParser(ModelArgParser):
         return self.add_additional_id_info(_lst)
 
     def get_class_name(self):
-        if self.trans_pe_type == PE_Type.none:
-            return 'Transformer_wo'
-        elif self.trans_pe_type == PE_Type.ape:
-            return 'Transformer_PE_reduce'
+        if self.trans_pe_type in (PE_Type.none, PE_Type.ape):
+            return 'Transformer_PE_real'
         else:
             raise ValueError(f"Unrecognized PE type {self.trans_pe_type.name}.")
 

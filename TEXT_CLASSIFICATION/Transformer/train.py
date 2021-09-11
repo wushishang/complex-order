@@ -11,18 +11,18 @@ import numpy as np
 
 from common.helper import log_stats, Util, print_stats
 from common.json_dump import JsonDump
-from util.constants import TC_ExperimentData, MaxSenLen
+from util.constants import TC_ExperimentData, MaxSenLen, PE_Type
 from utils import *
 from config import Config
 # from static_config import Static_Config
-from model_transformer.transformer_wo import Transformer_wo
-from model_transformer.PE_reduce import Transformer_PE_reduce
+# from model_transformer.transformer_wo import Transformer_wo
+from model_transformer.PE_reduce import Transformer_PE_real
 from model_transformer.TPE_reduce import Transformer_TPE_reduce
 from model_transformer.Complex_vanilla import Transformer_Complex_vanilla
 from model_transformer.Complex_order import Transformer_Complex_order
 
 
-namedclass = {'Transformer_wo': Transformer_wo, 'Transformer_PE_reduce': Transformer_PE_reduce,
+namedclass = {'Transformer_PE_real': Transformer_PE_real,
               'Transformer_TPE_reduce': Transformer_TPE_reduce,
               'Transformer_Complex_vanilla': Transformer_Complex_vanilla,
               'Transformer_Complex_order':Transformer_Complex_order}
@@ -177,7 +177,7 @@ class Train:
                                    , loss_train=float(np.mean(np.array(train_loss)))
                                    , acc_train=train_acc
                                    , acc_val=val_acc)
-                if isinstance(model, Transformer_PE_reduce):
+                if cfg.model_cfg.trans_pe_type == PE_Type.ape:
                     _es['pe_variance'], _es['pe_norm'] = get_pe_variance(model.src_embed[1].pe,
                                                                          cfg.original_mode,
                                                                          MaxSenLen[cfg.experiment_data])
@@ -185,13 +185,13 @@ class Train:
                 if val_acc > best_val_metric:
                     best_val_metric = val_acc
                     best_epoch = epoch
-                    if isinstance(model, Transformer_PE_reduce):
+                    if cfg.model_cfg.trans_pe_type == PE_Type.ape:
                         best_pe_variance, best_pe_norm = _es['pe_variance'], _es['pe_norm']
                     # Save Weights
                     best_model_dict = model.state_dict()
                     log_stats(logger_stats, "saving_model_checkpoint", epoch=epoch)
 
-                if isinstance(model, Transformer_PE_reduce):
+                if cfg.model_cfg.trans_pe_type == PE_Type.ape:
                     _es['best_pe_variance'], _es['best_pe_norm'] = best_pe_variance, best_pe_norm
 
                 _es.update(Util.dictize(best_val_metric=best_val_metric, best_epoch=best_epoch))
@@ -217,7 +217,7 @@ class Train:
         test_acc = evaluate_model(best_model, dataset.test_iterator, not cfg.original_mode)
         print('Final Test Accuracy: {:.4f}'.format(test_acc))
         _es_test = {'test_acc': test_acc}
-        if isinstance(best_model, Transformer_PE_reduce):
+        if cfg.model_cfg.trans_pe_type == PE_Type.ape:
             _es_test['best_pe_variance'], _es_test['best_pe_norm'] = get_pe_variance(best_model.src_embed[1].pe,
                                                                                      cfg.original_mode,
                                                                                      MaxSenLen[cfg.experiment_data])

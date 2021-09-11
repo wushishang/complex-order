@@ -11,7 +11,7 @@ from feed_forward import PositionwiseFeedForward
 import numpy as np
 from torch.autograd import Variable
 
-from util.constants import TC_OutputSize, Constants
+from util.constants import TC_OutputSize, Constants, PE_Type
 from utils import *
 from common.torch_util import TorchUtil as tu
 
@@ -43,9 +43,9 @@ class PositionalEncoding(nn.Module):
             x = torch.add(x, pe)
         return self.dropout(x)
 
-class Transformer_PE_reduce(nn.Module):
+class Transformer_PE_real(nn.Module):
     def __init__(self, config, src_vocab, max_len=5000):
-        super(Transformer_PE_reduce, self).__init__()
+        super(Transformer_PE_real, self).__init__()
         
         h, N, dropout = config.model_cfg.trans_num_heads, config.model_cfg.trans_num_layers, config.model_cfg.trans_dropout
         d_model, d_ff = config.model_cfg.trans_dim_model, config.model_cfg.trans_dim_ff
@@ -55,9 +55,16 @@ class Transformer_PE_reduce(nn.Module):
         position = PositionalEncoding(d_model, dropout, max_len=max_len,
                                       original_mode=config.original_mode,
                                       small_pe=config.model_cfg.trans_small_pe)
-        
+
+        self.PE_type = config.model_cfg.trans_pe_type
         self.encoder = Encoder(EncoderLayer(config.model_cfg.trans_dim_model, deepcopy(attn), deepcopy(ff), dropout), N)
-        self.src_embed = nn.Sequential(Embeddings(config.model_cfg.trans_dim_model, src_vocab), deepcopy(position))
+        if self.PE_type == PE_Type.none:
+            self.src_embed = nn.Sequential(Embeddings(config.model_cfg.trans_dim_model, src_vocab))
+        elif self.PE_type == PE_Type.ape:
+            self.src_embed = nn.Sequential(Embeddings(config.model_cfg.trans_dim_model, src_vocab), deepcopy(position))
+        else:
+            assert isinstance(self.PE_type, PE_Type)
+            raise NotImplementedError(f"Haven't implemented model with {self.PE_type.name} (PE type).")
 
         self.fc = nn.Linear(
             config.model_cfg.trans_dim_model,
