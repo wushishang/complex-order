@@ -57,6 +57,16 @@ class Train:
             log_stats(logger_stats, "Random seed info: random seeds have NOT been set.")
 
     @classmethod
+    def get_data(cls, cfg, logger_stats):
+        log_stats(logger_stats, 'Loading data...')
+        train_file = "../data/" + cfg.experiment_data.name
+        dataset = Dataset(cfg)
+        dataset.load_data(train_file, cfg.experiment_data.name)
+        log_stats(logger_stats, 'Loaded successfully!')
+
+        return dataset
+
+    @classmethod
     def get_model(cls, cfg, dataset, logger_stats):
         model = namedclass[cfg.model_cfg.get_class_name()](cfg, len(dataset.vocab), MaxSenLen[cfg.experiment_data])
         n_all_param = sum([p.nelement() for p in model.parameters()])
@@ -125,9 +135,7 @@ class Train:
         cls.set_seed(cfg.seed_val, cfg, logger_stats)
 
         # Initialize data
-        train_file = "../data/" + cfg.experiment_data.name
-        dataset = Dataset(cfg)
-        dataset.load_data(train_file, cfg.experiment_data.name)
+        dataset = cls.get_data(cfg, logger_stats)
 
         # Initialize model
         model = cls.get_model(cfg, dataset, logger_stats)
@@ -178,7 +186,6 @@ class Train:
                     best_val_metric = val_acc
                     best_epoch = epoch
                     if isinstance(model, Transformer_PE_reduce):
-                        # FIXME: only track PE up to max_sen_len
                         best_pe_variance, best_pe_norm = _es['pe_variance'], _es['pe_norm']
                     # Save Weights
                     best_model_dict = model.state_dict()
@@ -205,6 +212,18 @@ class Train:
         return best_val_metric, best_model
 
     @classmethod
+    def test_point_wise(cls, best_model, cfg, logger_stats, output_stats):
+        dataset = cls.get_data(cfg, logger_stats)
+        test_acc = evaluate_model(best_model, dataset.test_iterator, not cfg.original_mode)
+        print('Final Test Accuracy: {:.4f}'.format(test_acc))
+        _es_test = {'test_acc': test_acc}
+        if isinstance(best_model, Transformer_PE_reduce):
+            _es_test['best_pe_variance'], _es_test['best_pe_norm'] = get_pe_variance(best_model.src_embed[1].pe,
+                                                                                     cfg.original_mode,
+                                                                                     MaxSenLen[cfg.experiment_data])
+        output_stats.add(**_es_test)
+
+    @classmethod
     def main(cls):
         cfg = Config()
 
@@ -215,17 +234,7 @@ class Train:
 
         if cfg.experiment_data in (TC_ExperimentData.TREC_transformer, TC_ExperimentData.sst2_transformer):
             _, best_model = cls.dev_point_wise(cfg, logger_stats, epoch_stats)
-            train_file = "../data/" + cfg.experiment_data.name
-            dataset = Dataset(cfg)
-            dataset.load_data(train_file, cfg.experiment_data.name)
-            test_acc = evaluate_model(best_model, dataset.test_iterator, not cfg.original_mode)
-            print('Final Test Accuracy: {:.4f}'.format(test_acc))
-            _es_test = {'test_acc': test_acc}
-            if isinstance(best_model, Transformer_PE_reduce):
-                _es_test['best_pe_variance'], _es_test['best_pe_norm'] = get_pe_variance(best_model.src_embed[1].pe,
-                                                                                         cfg.original_mode,
-                                                                                         MaxSenLen[cfg.experiment_data])
-            output_stats.add(**_es_test)
+            cls.test_point_wise(cfg, best_model, logger_stats, output_stats)
         else:
             acc_flod = []
             for i in range(1, cfg.n_fold + 1):
