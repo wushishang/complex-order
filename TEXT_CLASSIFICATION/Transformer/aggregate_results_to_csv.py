@@ -94,5 +94,5 @@ class AggregateResults:
 
 
 if __name__ == '__main__':
-    AggregateResults.main('stats')
+    AggregateResults.main()
     # AggregateResults.stat_files()

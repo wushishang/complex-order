@@ -22,7 +22,7 @@ srun python -u $PYTHON_FILE instantiate_workers --start 0 --procs $N_PROCS --sin
 # sbatch --gpus-per-task=1
 
 # To avoid zombie workers on Gilbreth, specify types of nodes that are verified working when submitting jobs, e.g.,
-# sbatch --constraint=E  --array=0-6%6 --export=ALL,MKL_THREADING_LAYER=GNU,MKL_NUM_THREADS=2,PYTHON_FILE=run_experiments.py,N_PROCS=4 --gpus-per-task=1 run/run_cluster.sub
+# sbatch --constraint="a|b|c|d|e"  --array=0-6%6 --export=ALL,MKL_THREADING_LAYER=GNU,MKL_NUM_THREADS=2,PYTHON_FILE=run_experiments.py,N_PROCS=4 --gpus-per-task=1 run/run_cluster.sub
 
 # On Bruno's machines, remember to specify -p and --cpus-per-task
 # sbatch (-p ml08-gpu) --array=0-3%4 --export=ALL,MKL_THREADING_LAYER=GNU,MKL_NUM_THREADS=3,PYTHON_FILE=run_experiments.py,N_PROCS=4 --gpus-per-task=1 (--cpus-per-task=12) run/run_cluster.sub
