@@ -104,30 +104,32 @@ class Train:
                 best_pe_norm = state_dict['best_pe_norm']
             else:
                 best_pe_norm = None
-            # patience = state_dict['patience']
-            # patience_increase = state_dict['patience_increase']
+            patience = state_dict['patience']
+            patience_increase = state_dict['patience_increase']
+            patience_reductions = state_dict['patience_reductions']
             epoch = state_dict['epoch']
             best_epoch = state_dict['best_epoch']
             training_time = state_dict['training_time']
             # if cfg.testing:
             #     assert patience - epoch <= 1, "Training must be finished before testing!"
             log_stats(logger_stats,  # "testing" if cfg.testing else "restarting_optimization",
-                      best_val_metric=best_val_metric,  # patience=patience, patience_increase=patience_increase,
-                      epoch=epoch, training_time=training_time)
+                      best_val_metric=best_val_metric, patience=patience, patience_increase=patience_increase,
+                      patience_reductions=patience_reductions, epoch=epoch, training_time=training_time)
         else:
             best_val_metric = 0.
             best_model_dict = None
-            # patience = cfg.num_epochs  # look as these many epochs
-            # patience_increase = cfg.patience_increase  # wait these many epochs longer once validation error stops reducing
+            patience = cfg.num_epochs  # look as these many epochs
+            patience_increase = cfg.patience_increase  # wait these many epochs longer once validation error stops reducing
+            patience_reductions = 0
             best_pe_variance, best_pe_norm = None, None
             epoch = -1
             best_epoch = -1
             training_time = 0
             log_stats(logger_stats, "starting_optimization",
-                      best_val_metric=best_val_metric,  # patience=patience, patience_increase=patience_increase,
-                      epoch=epoch, training_time=0)
-        return model, best_model_dict, optimizer, best_val_metric, best_pe_variance, best_pe_norm,\
-               epoch, best_epoch, training_time  # patience, patience_increase,
+                      best_val_metric=best_val_metric, patience=patience, patience_increase=patience_increase,
+                      patience_reductions=patience_reductions, epoch=epoch, training_time=0)
+        return model, best_model_dict, optimizer, best_val_metric, patience, patience_increase, patience_reductions, \
+               best_pe_variance, best_pe_norm, epoch, best_epoch, training_time
 
     @classmethod
     def dev_point_wise(cls, cfg, logger_stats, epoch_stats):
@@ -147,23 +149,42 @@ class Train:
         model.add_loss_op(NLLLoss)
         best_model = copy.deepcopy(model)  # will load the final state at the end of training for model evaluation
 
-        model, best_model_dict, optimizer, best_val_metric, best_pe_variance, best_pe_norm \
-            , epoch, best_epoch, training_time = cls.load_state(cfg, model, optimizer, logger_stats)
+        model, best_model_dict, optimizer, best_val_metric, patience, patience_increase, patience_reductions, \
+            best_pe_variance, best_pe_norm, epoch, best_epoch, training_time = cls.load_state(cfg, model, optimizer, logger_stats)
 
         # train_losses = []
         # max_score = 0.1
 
         # TODO: 1. Save checkpoint for continued training and evaluation (finished)
         #       2. Add the original mode (fixed PE, incorrect use of .train() and .eval()) (finished)
-        #       3. Add regularization
-        #       4. Add different orderings for testing
-        #       5. Merge PE_reduce and wo
+        #       3. Merge PE_reduce and wo (finished)
+        #       4. Add regularization
+        #       5. Add different orderings for testing
+        #       6. Implement patience (finished)
 
         log_stats(logger_stats, "---------Training Model---------", model=model, optimizer=optimizer)
-        while cfg.num_epochs - epoch > 1:
+        while patience - epoch >= 1:
+            # start from current value of epoch and run till patience
+            # If during this period, patience increases, the outer loop takes care of it
+
+            # If lr_reduction_limit is larger than 1, we will continue training with reduced learning rate when
+            # patience runs up. We will train for 'cooldown' epochs first without monitoring change of evaluation metric,
+            # then resume monitoring training with patience_increase.
+            if patience - epoch == 1:
+                if patience_reductions < cfg.lr_reduction_limit:
+                    patience_reductions += 1
+                    log_stats(logger_stats, "Reducing LR")
+                    for g in optimizer.param_groups:
+                        g['lr'] *= cfg.lr_reduction_factor
+                    patience += (cfg.lr_reduction_cooldown + patience_increase)
+                    continue
+                else:
+                    break
+
+            # Update epoch here, or else the last value of epoch from the previous for loop will be duplicated.
             epoch = epoch + 1
 
-            for epoch in tqdm(range(epoch, cfg.num_epochs), desc="Epochs"):
+            for epoch in tqdm(range(epoch, patience), desc="Epochs"):
                 start_time = time.time()
                 # TODO: remove the unused 'val_accuracy'
                 train_loss, val_accuracy = model.run_epoch(dataset.train_iterator, epoch, optimizer)
@@ -183,6 +204,7 @@ class Train:
                                                                          MaxSenLen[cfg.experiment_data])
 
                 if val_acc > best_val_metric:
+                    patience = max(patience, epoch + patience_increase + 1)
                     best_val_metric = val_acc
                     best_epoch = epoch
                     if cfg.model_cfg.trans_pe_type == PE_Type.ape:
@@ -194,20 +216,26 @@ class Train:
                 if cfg.model_cfg.trans_pe_type == PE_Type.ape:
                     _es['best_pe_variance'], _es['best_pe_norm'] = best_pe_variance, best_pe_norm
 
-                _es.update(Util.dictize(best_val_metric=best_val_metric, best_epoch=best_epoch))
+                _es.update(Util.dictize(best_val_metric=best_val_metric, best_epoch=best_epoch,
+                                        patience_reductions=patience_reductions))
 
                 epoch_stats.add(**_es)
                 # Save state at the end of epoch
                 torch.save(Util.dictize(
                     model=model.state_dict(), best_model=best_model_dict if best_model_dict is not None else None,
                     optimizer=optimizer.state_dict(), best_val_metric=best_val_metric,
-                    epoch=epoch, best_epoch=best_epoch, best_pe_variance=best_pe_variance, best_pe_norm=best_pe_norm,
-                    training_time=training_time
+                    patience=patience, patience_increase=patience_increase, epoch=epoch, best_epoch=best_epoch,
+                    best_pe_variance=best_pe_variance, best_pe_norm=best_pe_norm, training_time=training_time,
+                    patience_reductions=patience_reductions
                 ), cfg.checkpoint_file_name())
 
         if best_model_dict is None:
             raise ValueError("Unexpected empty best_model_dict at the end of training.")
         best_model.load_state_dict(best_model_dict)
+
+        # Double-check training is finished
+        assert patience - epoch <= 1 and patience_reductions == cfg.lr_reduction_limit, \
+            "Training must be finished before testing!"
 
         return best_val_metric, best_model
 
@@ -234,7 +262,7 @@ class Train:
 
         if cfg.experiment_data in (TC_ExperimentData.TREC_transformer, TC_ExperimentData.sst2_transformer):
             _, best_model = cls.dev_point_wise(cfg, logger_stats, epoch_stats)
-            cls.test_point_wise(cfg, best_model, logger_stats, output_stats)
+            cls.test_point_wise(best_model, cfg, logger_stats, output_stats)
         else:
             acc_flod = []
             for i in range(1, cfg.n_fold + 1):

@@ -102,8 +102,8 @@ class Transformer_PE_real(nn.Module):
         val_accuracies = []
         # losses = []
         
-        if (epoch == int(self.max_epochs/3)) or (epoch == int(2*self.max_epochs/3)):
-            self.reduce_lr(optimizer)
+        # if (epoch == int(self.max_epochs/3)) or (epoch == int(2*self.max_epochs/3)):
+        #     self.reduce_lr(optimizer)
 
         if not self.original_mode:
             self.train()

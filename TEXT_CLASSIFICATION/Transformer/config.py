@@ -64,8 +64,14 @@ class Config:
         parser.add_argument('-lr', '--learning_rate', default=0.00001, type=float, help='Learning rate for Adam Optimizer')
         parser.add_argument('-ne', '--num_epochs', default=100, type=int,
                             help='Number of epochs for training at a maximum')
-#         parser.add_argument('-pi', '--patience_increase', default=100, type=int,
-#                             help='Number of epochs to increase patience')
+        parser.add_argument('-pi', '--patience_increase', default=100, type=int,
+                            help='Number of epochs to increase patience')
+        parser.add_argument('-lrl', '--lr_reduction_limit', default=2, type=int,
+                            help='Maximum number of learning rate reduction (when a metric has stopped improving)')
+        parser.add_argument('-lrrf', '--lr_reduction_factor', default=0.5, type=float,
+                            help='Factor by which the learning rate will be reduced')
+        parser.add_argument('-lrrc', '--lr_reduction_cooldown', default=0, type=int,
+                            help='Number of epochs to wait before resuming normal operation after lr has been reduced')
 #         parser.add_argument('-ni', '--num_inf_perm', default=5, type=int, help='Number of inference-time permutations')
 #         parser.add_argument('-ei', '--eval_interval', default=50, type=int, help='Time interval of more-permutation inference')
 #         parser.add_argument('-et', '--eval_train', default=False, action='store_true',
@@ -302,8 +308,14 @@ class Config:
 #         # ===================================================
         self.learning_rate = args.learning_rate
         self.num_epochs = args.num_epochs
-#         self.patience_increase = args.patience_increase
-#         assert self.patience_increase >= 0, "Patience is a non-negative int"
+        self.patience_increase = args.patience_increase
+        self.lr_reduction_limit = args.lr_reduction_limit
+        self.lr_reduction_factor = args.lr_reduction_factor
+        self.lr_reduction_cooldown = args.lr_reduction_cooldown
+        assert self.patience_increase >= 0, "Patience increase is a non-negative int"
+        assert self.lr_reduction_limit >= 0, "LR reduction limit is a non-negative int"
+        assert 0. < self.lr_reduction_factor < 1.
+        assert self.lr_reduction_cooldown >= 0, "LR reduction cooldown is a non-negative int"
 #         self.num_inf_perm = args.num_inf_perm
 #         self.eval_interval = args.eval_interval
 #         assert self.eval_interval > 0, "eval_interval must be a positive integer"
@@ -595,7 +607,9 @@ class Config:
         """
         Return Training Information
         """
-        train_params = [self.original_mode, self.learning_rate, self.num_epochs, self.seed_val, self.batch_size]
+        train_params = [self.original_mode, self.learning_rate, self.num_epochs, self.patience_increase,
+                        self.seed_val, self.batch_size,
+                        self.lr_reduction_limit, self.lr_reduction_factor, self.lr_reduction_cooldown]
 #         train_params = [self.permute_for_pi_sgd, self.permute_positional_encoding, self.learning_rate,
 #                         self.patience_increase, self.seed_val, self.num_epochs, self.num_inf_perm, self.eval_interval,
 #                         self.eval_train, self.shuffle_batches]
