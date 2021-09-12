@@ -52,15 +52,16 @@ class Transformer_PE_real(nn.Module):
         
         attn = MultiHeadedAttention(h, d_model)
         ff = PositionwiseFeedForward(d_model, d_ff, dropout)
-        position = PositionalEncoding(d_model, dropout, max_len=max_len,
-                                      original_mode=config.original_mode,
-                                      small_pe=config.model_cfg.trans_small_pe)
 
         self.PE_type = config.model_cfg.trans_pe_type
         self.encoder = Encoder(EncoderLayer(config.model_cfg.trans_dim_model, deepcopy(attn), deepcopy(ff), dropout), N)
+
         if self.PE_type == PE_Type.none:
             self.src_embed = nn.Sequential(Embeddings(config.model_cfg.trans_dim_model, src_vocab))
         elif self.PE_type == PE_Type.ape:
+            position = PositionalEncoding(d_model, dropout, max_len=max_len,
+                                          original_mode=config.original_mode,
+                                          small_pe=config.model_cfg.trans_small_pe)
             self.src_embed = nn.Sequential(Embeddings(config.model_cfg.trans_dim_model, src_vocab), deepcopy(position))
         else:
             assert isinstance(self.PE_type, PE_Type)
