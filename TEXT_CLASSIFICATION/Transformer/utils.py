@@ -142,7 +142,7 @@ def evaluate_model(model, iterator, eval=True):
             x = batch.text[0].cuda()
         else:
             x = batch.text[0]
-        y_pred = model(x)
+        y_pred = model.predict(x)
         predicted = torch.max(y_pred.cpu().data, 1)[1] + 1
         all_preds.extend(predicted.numpy())
         all_y.extend(batch.label.numpy())

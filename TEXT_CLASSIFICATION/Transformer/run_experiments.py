@@ -5,9 +5,9 @@ TRANSFORMER_TWO_TASKS = False
 PI_TRANSFORMER_HP_TUNING = False
 PS_TRANSFORMER_HP_TUNING = False
 PS_TRANSFORMER_SMALL_PE = False
-UNREG_TRANSFORMER_PATIENCE = True
+UNREG_TRANSFORMER_PATIENCE = False
 
-SYNTAX_CHECK = False
+SYNTAX_CHECK = True
 DRYRUN = True
 
 EXP_DATE = "_sept_11_2021" # "_apr_10"
@@ -123,7 +123,7 @@ elif PS_TRANSFORMER_HP_TUNING:
 elif SYNTAX_CHECK:
 
     # data config
-    data = ""
+    data = "-it set "
 
     # model_config
     model = "-mt Transformer "
@@ -143,7 +143,7 @@ elif SYNTAX_CHECK:
         for _trans_pt in ['none', 'ape']
         for _trans_pl in ['last_dim']  # , 'sum', 'max'
         for _trans_dp in [0.1]  # 0., 0.5
-        for _sv in [781]
+        for _sv in [783]
 
         # for _bf in powerset(binary_flags)
     ]
@@ -198,7 +198,7 @@ elif UNREG_TRANSFORMER_PATIENCE:
         for _lr in [0.001, 0.0001, 0.00001]
         for _bs in [32, 64, 128]
         for _trans_pt in ['none', 'ape']
-        for _trans_nl in [2]  # 1,
+        for _trans_nl in [1]  # 2
         for _trans_pl in ['last_dim']
         for _trans_dp in [0., 0.1, 0.5]
         for _sv in range(133347, 133352)

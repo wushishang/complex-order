@@ -7,13 +7,16 @@ import argparse
 # from common.helper import PickleUtil, Util, print_stats
 # from configs.data_config import DataArgParser
 # from configs.graph_config import GraphDataArgParser
+from collections import OrderedDict
+
 from common.helper import print_stats, Util, PickleUtil
 from configs.model_config import ModelArgParser
 # from configs.set_config import SetDataArgParser
 from configs.transformer_config import TransformerArgParser
 from my_common.my_helper import enum_sprint, is_positive_int
 # from scalings import Scalings
-from util.constants import TC_ExperimentData, TC_ModelType, Constants, MaxSenLen
+from util.constants import TC_ExperimentData, TC_ModelType, Constants, MaxSenLen, RegRepresentation, Regularization, \
+    InputType, ModelType
 
 RESULT_DIR = "./results/"
 MODEL_DIR = "./model_save/"
@@ -38,8 +41,8 @@ class Config:
         # ##########
         # # PARAMETERS FOR DATA LOADING
         # ##########
-        # parser.add_argument('-it', '--input_type', type=str, required=True,
-        #                     help=f'Type of input. One of: {enum_sprint(InputType)}')
+        parser.add_argument('-it', '--input_type', type=str, required=True,
+                            help=f'Type of input. One of: {enum_sprint(InputType)}')
         # parser.add_argument('-ix', '--cv_fold', type=int, help='Which fold in cross-validation (e.g., 0 thru 5)',
         #                     required=True)
         # parser.add_argument('--train_all', default=False, action='store_true',
@@ -92,8 +95,8 @@ class Config:
 #                             help="Don't shuffle batches for every epoch")
 #         parser.add_argument('--dont_permute_for_pi_sgd', default=False, action='store_true',
 #                             help='If set, pi-SGD training will NOT be used: data will not be permuted')
-#         parser.add_argument('-ppe', '--permute_positional_encoding', action='store_true',
-#                             help='If true, permute positional encodings (default: permute input data)')
+        parser.add_argument('-ppe', '--permute_positional_encoding', action='store_true',
+                            help='If true, permute positional encodings (default: permute input data)')
 #
 #         ##########
 #         # PARAMETERS THAT CONTROL PADDING
@@ -145,43 +148,43 @@ class Config:
 #         parser.add_argument('--wd_power', nargs='+', default=[2], type=int,
 #                             help='The (list of) powers in the weight decay terms for positional embedding (default: 2)')
 #
-#         ##########
-#         # PARAMETERS THAT CONTROL REGULARIZATION
-#         ##########
-#         #
-#         # General regularization options
-#         #
-#         parser.add_argument('-r', '--regularization', type=str,
-#                             help='Type of regularization to apply', default='none')
-#         parser.add_argument('-r_strength', '--regularization_strength', default=None,
-#                             help='Regularization strength')
-#         # User be aware! r_eps effectively becomes multiplied by the regularization
-#         # penalty in finite difference penalties.  So it interacts with reg strength
-#         parser.add_argument('-r_eps', '--regularization_epsilon', default=None, type=float,
-#                             help='Size of finite difference for regularization')
-#         parser.add_argument('--fixed_edge', action='store_true',
-#                             help='Fix the edge of DS matrices for diff_step_edge regularization')
-#         parser.add_argument('--random_segment', action='store_true',
-#                             help='Randomly swap two rows when constructing the DS matrices for diff_step_edge regularization')
-#         # TODO: implement more permutations later (argument: '-r_np')
-#         parser.add_argument('-r_np', '--regularization_num_perms', default=None,
-#                             help='Number of extra permutations for regularization')
-#         parser.add_argument('-r_repr', '--regularization_representation', type=str, default='none', help=f"Penalize \
-#                             permutation sensitivity in one of {enum_sprint(RegRepresentation)} (default: none)")
-#         parser.add_argument('--r_normed', default=False, action='store_true',
-#                             help='Compute norm, not only a power, of penalty by taking root (default:False)')
-#         parser.add_argument('--r_power', default=2, type=int,
-#                             help='The power in the penalty term (default: 2)')
-#         parser.add_argument('-r_agg_by_node', '--aggregate_penalty_by_node', default=False, action='store_true',
-#                             help="This argument only affects node classification tasks. If True, "
-#                                  "the penalty will be mean aggregated by nodes; otherwise by graphs (default: by graphs)")
-#         #
-#         # TangentProp options
-#         #
-#         parser.add_argument('-tpp', '--tangent_prop', action='store_true',
-#                             help='Use TangentProp regularization (default: False)')
-#         parser.add_argument('-tp_ntv', '--tp_num_tangent_vectors', default=1, type=int,
-#                             help='Number of tangent vectors for TangentProp (default:1)')
+        ##########
+        # PARAMETERS THAT CONTROL REGULARIZATION
+        ##########
+        #
+        # General regularization options
+        #
+        parser.add_argument('-r', '--regularization', type=str,
+                            help='Type of regularization to apply', default='none')
+        parser.add_argument('-r_strength', '--regularization_strength', default=None,
+                            help='Regularization strength')
+        # User be aware! r_eps effectively becomes multiplied by the regularization
+        # penalty in finite difference penalties.  So it interacts with reg strength
+        parser.add_argument('-r_eps', '--regularization_epsilon', default=None, type=float,
+                            help='Size of finite difference for regularization')
+        parser.add_argument('--fixed_edge', action='store_true',
+                            help='Fix the edge of DS matrices for diff_step_edge regularization')
+        parser.add_argument('--random_segment', action='store_true',
+                            help='Randomly swap two rows when constructing the DS matrices for diff_step_edge regularization')
+        # TODO: implement more permutations later (argument: '-r_np')
+        parser.add_argument('-r_np', '--regularization_num_perms', default=None,
+                            help='Number of extra permutations for regularization')
+        parser.add_argument('-r_repr', '--regularization_representation', type=str, default='none', help=f"Penalize \
+                            permutation sensitivity in one of {enum_sprint(RegRepresentation)} (default: none)")
+        parser.add_argument('--r_normed', default=False, action='store_true',
+                            help='Compute norm, not only a power, of penalty by taking root (default:False)')
+        parser.add_argument('--r_power', default=2, type=int,
+                            help='The power in the penalty term (default: 2)')
+        # parser.add_argument('-r_agg_by_node', '--aggregate_penalty_by_node', default=False, action='store_true',
+        #                     help="This argument only affects node classification tasks. If True, "
+        #                          "the penalty will be mean aggregated by nodes; otherwise by graphs (default: by graphs)")
+        #
+        # TangentProp options
+        #
+        parser.add_argument('-tpp', '--tangent_prop', action='store_true',
+                            help='Use TangentProp regularization (default: False)')
+        parser.add_argument('-tp_ntv', '--tp_num_tangent_vectors', default=1, type=int,
+                            help='Number of tangent vectors for TangentProp (default:1)')
 #         #
 #         # Regularization Schedulers
 #         #
@@ -220,10 +223,10 @@ class Config:
             self.max_sen_len = MaxSenLen[self.experiment_data]
             print_stats(f"Specified max_sen_len is 0. Reset to max_sen_len of training samples of {self.experiment_data.name}.")
 
-#         # ===================================================
-#         # Parameters for data and model types
-#         # ===================================================
-#         self.input_type = InputType[args.input_type.lower()]
+        # ===================================================
+        # Parameters for data and model types
+        # ===================================================
+        self.input_type = InputType[args.input_type.lower()]
         self.model_type = TC_ModelType[args.model_type.lower()]
 #
 #         # assign parsed hyperparameters to attributes of config containers
@@ -354,7 +357,7 @@ class Config:
 #             assert self.model_cfg.gin_model_type == GinModelType.rpGin, "Pi-SGD cannot be used with Gin models other than rpGin"
 #         self.permute_for_pi_sgd = not args.dont_permute_for_pi_sgd
 #
-#         self.permute_positional_encoding = args.permute_positional_encoding
+        self.permute_positional_encoding = args.permute_positional_encoding
 #
 #         # ===================================================
 #         # Parameters that control variance evaluation
@@ -400,55 +403,55 @@ class Config:
 #         self.wd_strength = args.wd_strength
 #         self.wd_power = args.wd_power
 #
-#         # ===================================================
-#         # Parameters that control regularization
-#         # ===================================================
-#         self.regularization = Regularization[args.regularization.lower()]
-#         if self.regularization != Regularization.none:
-#             if self.model_type == ModelType.gin_like:
-#                 assert self.model_cfg.gin_model_type == GinModelType.rpGin, "Regularizers cannot be used with Gin models other than rpGin"
-#         self.regularization_strength = args.regularization_strength
-#         self.regularization_eps = args.regularization_epsilon
-#         self.num_reg_permutations = args.regularization_num_perms
-#         self.fixed_edge = args.fixed_edge
-#         self.random_segment = args.random_segment
-#
-#         if self.regularization_strength is not None:
-#             self.regularization_strength = float(self.regularization_strength)
-#             assert self.regularization_strength >= 0.0  # Allow 0.0 for debug and easy hyperparameter search
-#
-#         if self.regularization != Regularization.none and self.regularization != Regularization.naive:
-#             assert self.regularization_eps is not None
-#             assert self.regularization_eps > 0.0
-#
-#         if self.num_reg_permutations is not None:
-#             self.num_reg_permutations = int(self.num_reg_permutations)
-#             assert self.num_reg_permutations > 0
-#
-#         self.r_normed = args.r_normed
-#         self.r_power = args.r_power
-#         assert self.r_power > 0
-#
-#         self.regularization_representation = RegRepresentation[args.regularization_representation.lower()]
-#         self.tangent_prop = args.tangent_prop
-#
-#         if args.r_normed or args.r_power != parser.get_default('r_power'):
-#             assert self.regularization != Regularization.none, \
-#                 "Non-default values of r_normed or r_power were specified, but self.regularization is none"
-#
-#         if args.aggregate_penalty_by_node != parser.get_default('aggregate_penalty_by_node'):
-#             assert self.regularization != Regularization.none and self.input_type == InputType.graph, "Non-default value \
-#             of aggregate_penalty_by_node was specified, but regularization is none or the input is not graphs."
-#         self.aggregate_penalty_by_node = args.aggregate_penalty_by_node
-#
-#         # If tangent prop options are specified, we must be using tangent prop
-#         if args.tp_num_tangent_vectors != parser.get_default('tp_num_tangent_vectors'):
-#             assert self.tangent_prop, \
-#                 "Non-default value of tp_num_tangent_vectors was specified, but --tangent_prop is False"
-#
-#         assert args.tp_num_tangent_vectors > 0
-#         self.tp_config = OrderedDict()
-#         self.tp_config['tp_num_tangent_vectors'] = args.tp_num_tangent_vectors
+        # ===================================================
+        # Parameters that control regularization
+        # ===================================================
+        self.regularization = Regularization[args.regularization.lower()]
+        # if self.regularization != Regularization.none:
+        #     if self.model_type == ModelType.gin_like:
+        #         assert self.model_cfg.gin_model_type == GinModelType.rpGin, "Regularizers cannot be used with Gin models other than rpGin"
+        self.regularization_strength = args.regularization_strength
+        self.regularization_eps = args.regularization_epsilon
+        self.num_reg_permutations = args.regularization_num_perms
+        self.fixed_edge = args.fixed_edge
+        self.random_segment = args.random_segment
+
+        if self.regularization_strength is not None:
+            self.regularization_strength = float(self.regularization_strength)
+            assert self.regularization_strength >= 0.0  # Allow 0.0 for debug and easy hyperparameter search
+
+        if self.regularization != Regularization.none and self.regularization != Regularization.naive:
+            assert self.regularization_eps is not None
+            assert self.regularization_eps > 0.0
+
+        if self.num_reg_permutations is not None:
+            self.num_reg_permutations = int(self.num_reg_permutations)
+            assert self.num_reg_permutations > 0
+
+        self.r_normed = args.r_normed
+        self.r_power = args.r_power
+        assert self.r_power > 0
+
+        self.regularization_representation = RegRepresentation[args.regularization_representation.lower()]
+        self.tangent_prop = args.tangent_prop
+
+        if args.r_normed or args.r_power != parser.get_default('r_power'):
+            assert self.regularization != Regularization.none, \
+                "Non-default values of r_normed or r_power were specified, but self.regularization is none"
+
+        # if args.aggregate_penalty_by_node != parser.get_default('aggregate_penalty_by_node'):
+        #     assert self.regularization != Regularization.none and self.input_type == InputType.graph, "Non-default value \
+        #     of aggregate_penalty_by_node was specified, but regularization is none or the input is not graphs."
+        # self.aggregate_penalty_by_node = args.aggregate_penalty_by_node
+
+        # If tangent prop options are specified, we must be using tangent prop
+        if args.tp_num_tangent_vectors != parser.get_default('tp_num_tangent_vectors'):
+            assert self.tangent_prop, \
+                "Non-default value of tp_num_tangent_vectors was specified, but --tangent_prop is False"
+
+        assert args.tp_num_tangent_vectors > 0
+        self.tp_config = OrderedDict()
+        self.tp_config['tp_num_tangent_vectors'] = args.tp_num_tangent_vectors
 #
 #         self.two_phase_regularization = args.two_phase_regularization
 #         self.pull_down = args.pull_down
@@ -583,7 +586,7 @@ class Config:
         """
         Return Data Information
         """
-        data_params = [self.experiment_data.name, self.max_sen_len]  # self.cv_fold
+        data_params = [self.input_type, self.experiment_data.name, self.max_sen_len]  # self.cv_fold
 
         # data_params += [self.data_id, self.data_cfg.n_splits, self.data_cfg.use_default_train_val_split,
         #                 self.data_cfg.scale_target, self.data_cfg.balance_target]
@@ -609,7 +612,8 @@ class Config:
         """
         train_params = [self.original_mode, self.learning_rate, self.num_epochs, self.patience_increase,
                         self.seed_val, self.batch_size,
-                        self.lr_reduction_limit, self.lr_reduction_factor, self.lr_reduction_cooldown]
+                        self.lr_reduction_limit, self.lr_reduction_factor, self.lr_reduction_cooldown,
+                        self.permute_positional_encoding]
 #         train_params = [self.permute_for_pi_sgd, self.permute_positional_encoding, self.learning_rate,
 #                         self.patience_increase, self.seed_val, self.num_epochs, self.num_inf_perm, self.eval_interval,
 #                         self.eval_train, self.shuffle_batches]
@@ -645,21 +649,21 @@ class Config:
 #         if self.weight_decay:
 #             train_params += self.wd_strength
 #             train_params += self.wd_power
-#         #
-#         # Add Regularization Information
-#         #
-#         if self.regularization != Regularization.none:
-#             train_params += [self.regularization.name]
-#             if self.regularization in (Regularization.diff_step_edge, Regularization.diff_step_basis):
-#                 train_params += [self.fixed_edge, self.random_segment]
-#             train_params += [self.num_reg_permutations, self.regularization_strength, self.regularization_eps,
-#                              self.regularization_representation.name, self.r_normed, self.r_power, self.tangent_prop]
-#             if self.tangent_prop:
-#                 train_params += list(self.tp_config.values())
-#             if self.input_type == InputType.graph:
-#                 train_params += [self.aggregate_penalty_by_node]
-#             if self.two_phase_regularization:
-#                 train_params += [self.pull_down, self.milestone]
+        #
+        # Add Regularization Information
+        #
+        if self.regularization != Regularization.none:
+            train_params += [self.regularization.name]
+            if self.regularization in (Regularization.diff_step_edge, Regularization.diff_step_basis):
+                train_params += [self.fixed_edge, self.random_segment]
+            train_params += [self.num_reg_permutations, self.regularization_strength, self.regularization_eps,
+                             self.regularization_representation.name, self.r_normed, self.r_power, self.tangent_prop]
+            if self.tangent_prop:
+                train_params += list(self.tp_config.values())
+            # if self.input_type == InputType.graph:
+            #     train_params += [self.aggregate_penalty_by_node]
+            # if self.two_phase_regularization:
+            #     train_params += [self.pull_down, self.milestone]
 #         #
 #         # Add General Information
 #         #

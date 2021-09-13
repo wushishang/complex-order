@@ -1,5 +1,5 @@
 import torch
-from common import Util
+from common.helper import Util
 from my_common.my_helper import concat_list
 from util.constants import *
 

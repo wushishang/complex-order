@@ -11,7 +11,8 @@ import numpy as np
 
 from common.helper import log_stats, Util, print_stats
 from common.json_dump import JsonDump
-from util.constants import TC_ExperimentData, MaxSenLen, PE_Type
+from regularizers import JpRegularizer
+from util.constants import TC_ExperimentData, MaxSenLen, PE_Type, TaskType
 from utils import *
 from config import Config
 # from static_config import Static_Config
@@ -68,8 +69,26 @@ class Train:
 
     @classmethod
     def get_model(cls, cfg, dataset, logger_stats):
+        log_stats(logger_stats, "Building model...")
+
+        #
+        # Initialize the regularizer
+        #
+        regularizer = JpRegularizer(cfg.regularization, cfg.input_type, total_permutations=cfg.num_reg_permutations,
+                                    strength=cfg.regularization_strength, eps=cfg.regularization_eps,
+                                    representations=cfg.regularization_representation, normed=cfg.r_normed,
+                                    power=cfg.r_power, tangent_prop=cfg.tangent_prop, tp_config=cfg.tp_config,
+                                    fixed_edge=cfg.fixed_edge, random_segment=cfg.random_segment,
+                                    permute_positional_encoding=cfg.permute_positional_encoding,
+                                    task_type=None,  # if cfg.task_type == TaskType.node_classification
+                                    agg_penalty_by_node=False)  # cfg.aggregate_penalty_by_node
+
+        log_stats(logger_stats, "Regularization Info", regularizer=regularizer)
+        # log_stats(logger_stats, "Scaling Info", scaling=cfg.scaling)
+
         model = namedclass[cfg.model_cfg.get_class_name()](cfg, len(dataset.vocab), MaxSenLen[cfg.experiment_data])
         n_all_param = sum([p.nelement() for p in model.parameters()])
+        model.add_regularizer(regularizer)
         log_stats(logger_stats, 'Model specifications:', num_params=n_all_param)
         if torch.cuda.is_available():
             model.cuda()
@@ -144,7 +163,7 @@ class Train:
         if cfg.original_mode:
             model.train()
         optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate)
-        NLLLoss = nn.CrossEntropyLoss()
+        NLLLoss = nn.CrossEntropyLoss(reduction='none')
         # model.add_optimizer(optimizer)
         model.add_loss_op(NLLLoss)
         best_model = copy.deepcopy(model)  # will load the final state at the end of training for model evaluation
@@ -186,20 +205,22 @@ class Train:
 
             for epoch in tqdm(range(epoch, patience), desc="Epochs"):
                 start_time = time.time()
-                # TODO: remove the unused 'val_accuracy'
-                train_loss, val_accuracy = model.run_epoch(dataset.train_iterator, epoch, optimizer)
+                overall_losses, train_losses, breg_penalties = model.run_epoch(dataset.train_iterator, optimizer)
                 epoch_time = time.time() - start_time
                 training_time += epoch_time
 
-                # train_losses.append(train_loss)
+                # Evaluate the model on (training and) validation
                 train_acc = evaluate_model(model, dataset.train_iterator, not cfg.original_mode)
                 val_acc = evaluate_model(model, dataset.val_iterator, not cfg.original_mode)
+
                 _es = Util.dictize(epoch=epoch
-                                   , loss_train=float(np.mean(np.array(train_loss)))
+                                   , overall_loss=float(np.mean(np.array(overall_losses)))
+                                   , breg_penalties=float(np.mean(np.array(breg_penalties)))
+                                   , loss_train=float(np.mean(np.array(train_losses)))
                                    , acc_train=train_acc
                                    , acc_val=val_acc)
                 if cfg.model_cfg.trans_pe_type == PE_Type.ape:
-                    _es['pe_variance'], _es['pe_norm'] = get_pe_variance(model.src_embed[1].pe,
+                    _es['pe_variance'], _es['pe_norm'] = get_pe_variance(model.input_embed.pe,
                                                                          cfg.original_mode,
                                                                          MaxSenLen[cfg.experiment_data])
 
@@ -246,7 +267,7 @@ class Train:
         print('Final Test Accuracy: {:.4f}'.format(test_acc))
         _es_test = {'test_acc': test_acc}
         if cfg.model_cfg.trans_pe_type == PE_Type.ape:
-            _es_test['best_pe_variance'], _es_test['best_pe_norm'] = get_pe_variance(best_model.src_embed[1].pe,
+            _es_test['best_pe_variance'], _es_test['best_pe_norm'] = get_pe_variance(best_model.input_embed.pe,
                                                                                      cfg.original_mode,
                                                                                      MaxSenLen[cfg.experiment_data])
         output_stats.add(**_es_test)
