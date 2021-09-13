@@ -61,7 +61,6 @@ class Transformer_PE_real(nn.Module):
 
         self.PE_type = config.model_cfg.trans_pe_type
         self.encoder = Encoder(EncoderLayer(config.model_cfg.trans_dim_model, deepcopy(attn), deepcopy(ff), dropout), N)
-        self.token_embed = Embeddings(config.model_cfg.trans_dim_model, src_vocab)
 
         if self.PE_type == PE_Type.ape:
             position = PositionalEncoding(d_model, dropout, max_len=max_len,
@@ -73,6 +72,8 @@ class Transformer_PE_real(nn.Module):
         else:
             assert isinstance(self.PE_type, PE_Type)
             raise NotImplementedError(f"Haven't implemented model with {self.PE_type.name} (PE type).")
+
+        self.token_embed = Embeddings(config.model_cfg.trans_dim_model, src_vocab)
 
         self.fc = nn.Linear(
             config.model_cfg.trans_dim_model,

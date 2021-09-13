@@ -586,7 +586,7 @@ class Config:
         """
         Return Data Information
         """
-        data_params = [self.input_type, self.experiment_data.name, self.max_sen_len]  # self.cv_fold
+        data_params = [self.input_type.name, self.experiment_data.name, self.max_sen_len]  # self.cv_fold
 
         # data_params += [self.data_id, self.data_cfg.n_splits, self.data_cfg.use_default_train_val_split,
         #                 self.data_cfg.scale_target, self.data_cfg.balance_target]
