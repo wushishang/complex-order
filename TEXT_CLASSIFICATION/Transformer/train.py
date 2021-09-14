@@ -231,7 +231,7 @@ class Train:
                     if cfg.model_cfg.trans_pe_type == PE_Type.ape:
                         best_pe_variance, best_pe_norm = _es['pe_variance'], _es['pe_norm']
                     # Save Weights
-                    best_model_dict = model.state_dict()
+                    best_model_dict = copy.deepcopy(model.state_dict())
                     log_stats(logger_stats, "saving_model_checkpoint", epoch=epoch)
 
                 if cfg.model_cfg.trans_pe_type == PE_Type.ape:
