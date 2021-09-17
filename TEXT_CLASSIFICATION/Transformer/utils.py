@@ -1,4 +1,5 @@
 # utils.py
+import random
 
 import torch
 from torchtext.legacy import data
@@ -10,7 +11,9 @@ import pandas as pd
 import os 
 import re
 
+from config import Config
 from my_common.my_helper import is_positive_int
+from util.constants import SentenceOrdering
 
 
 class Dataset(object):
@@ -30,7 +33,7 @@ class Dataset(object):
 
         full_df = pd.read_csv(filename, header=None, sep="\t", names=["text", "label"],encoding='gbk', quoting=3).fillna('N')
         return full_df
-    
+
     def load_data(self, train_file, dataset, val_file=None):
         
         if dataset=='sst2_transformer' or dataset=='TREC_transformer':
@@ -71,8 +74,18 @@ class Dataset(object):
             shuffle=False)
         if dataset=='sst2_transformer' or dataset=='TREC_transformer':
             test_df = self.get_pandas_df(train_file+'/test.csv')
-            test_examples = [data.Example.fromlist(i, datafields) for i in test_df.values.tolist()]
-            test_data = data.Dataset(test_examples, datafields)
+            if self.config.testing_ordering == SentenceOrdering.pad_first:
+                TEXT_test = data.Field(sequential=True, tokenize=tokenizer, lower=True, fix_length=self.config.max_sen_len,
+                                  include_lengths=True, pad_first=True)
+                test_datafields = [("text", TEXT_test), ("label", LABEL)]
+                train_examples = [data.Example.fromlist(i, test_datafields) for i in train_df.values.tolist()]
+                train_data = data.Dataset(train_examples, test_datafields)
+                TEXT_test.build_vocab(train_data)
+            else:
+                test_datafields = datafields
+            test_examples = [data.Example.fromlist(i, test_datafields) for i in test_df.values.tolist()]
+            test_data = data.Dataset(test_examples, test_datafields)
+            order_test(test_data, self.config)
             self.test_iterator= data.BucketIterator(
                 test_data,
                 batch_size=self.config.batch_size,
@@ -167,3 +180,21 @@ def get_pe_variance(pe, original_mode=False, max_len=None):
     norm = torch.norm(pe_weight).item()
 
     return pe_var, norm
+
+def order_test(dataset, cfg: Config):
+    assert isinstance(dataset, data.dataset.Dataset) and isinstance(cfg, Config)
+    assert hasattr(cfg, 'testing_ordering')
+    if cfg.testing_ordering == SentenceOrdering.random:
+        for sentence in dataset.examples:
+            random.Random(cfg.testing_shuffle_seed).shuffle(sentence.text)
+    elif cfg.testing_ordering == SentenceOrdering.sort_up:
+        for sentence in dataset.examples:
+            sentence.text.sort()
+    elif cfg.testing_ordering == SentenceOrdering.sort_down:
+        for sentence in dataset.examples:
+            sentence.text.sort(reverse=True)
+    elif cfg.testing_ordering == SentenceOrdering.reverse:
+        for sentence in dataset.examples:
+            sentence.text.reverse()
+    else:
+        assert cfg.testing_ordering in (SentenceOrdering.id, SentenceOrdering.pad_first)

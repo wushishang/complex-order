@@ -75,6 +75,8 @@ class PoolingFunction:
             return partial(torch.sum, dim=1)
         elif pool == Pooling.max:
             return self.max_pooling
+        elif pool == Pooling.mean:
+            return partial(torch.mean, dim=1)
         else:
             raise NotImplementedError(f"Haven't yet implemented models with {pool.name} pooling.")
 

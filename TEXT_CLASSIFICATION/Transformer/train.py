@@ -257,19 +257,24 @@ class Train:
         # Double-check training is finished
         assert patience - epoch <= 1 and patience_reductions == cfg.lr_reduction_limit, \
             "Training must be finished before testing!"
+        log_stats(logger_stats, 'Training finished!')
 
         return best_val_metric, best_model
 
     @classmethod
     def test_point_wise(cls, best_model, cfg, logger_stats, output_stats):
+        log_stats(logger_stats, "---------Testing Model---------", testing_ordering=cfg.testing_ordering.name)
         dataset = cls.get_data(cfg, logger_stats)
         test_acc = evaluate_model(best_model, dataset.test_iterator, not cfg.original_mode)
-        print('Final Test Accuracy: {:.4f}'.format(test_acc))
-        _es_test = {'test_acc': test_acc}
+        print(f'Final Test Accuracy: {test_acc}; Testing ordering: {cfg.testing_ordering.name}')
+        _es_test = {'test_acc': test_acc, 'test_order': cfg.testing_ordering}
+        if cfg.testing_ordering == SentenceOrdering.random:
+            _es_test['test_shuffle_seed'] = cfg.testing_shuffle_seed
         if cfg.model_cfg.trans_pe_type == PE_Type.ape:
             _es_test['best_pe_variance'], _es_test['best_pe_norm'] = get_pe_variance(best_model.input_embed.pe,
                                                                                      cfg.original_mode,
                                                                                      MaxSenLen[cfg.experiment_data])
+        log_stats(logger_stats, "Testing finished!")
         output_stats.add(**_es_test)
 
     @classmethod

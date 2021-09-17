@@ -12,6 +12,7 @@ class Pooling(Enum):
     last_dim = 1
     sum = 2
     max = 3
+    mean = 4
 
 
 class PE_Type(Enum):
@@ -42,6 +43,15 @@ TC_OutputSize = {TC_ExperimentData.TREC_transformer: 6, TC_ExperimentData.sst2_t
 MaxSenLen = {TC_ExperimentData.TREC_transformer: 53, TC_ExperimentData.sst2_transformer: 37}
                  # TC_ExperimentData.cr: 2, TC_ExperimentData.mpqa: 2,
                  # TC_ExperimentData.mr: 2, TC_ExperimentData.subj: 2}
+
+
+class SentenceOrdering(Enum):
+    id = 1
+    random = 2
+    sort_up = 3
+    sort_down = 4
+    pad_first = 5
+    reverse = 6
 
 
 class Activation(Enum):

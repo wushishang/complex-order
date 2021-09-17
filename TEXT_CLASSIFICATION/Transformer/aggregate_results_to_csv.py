@@ -16,7 +16,7 @@ from config import Config
 from functools import partial
 
 
-def fetch_df(c, stats_or_output):
+def fetch_df(c, stats_or_output, aggregate_all_output):
     t, td = c
     t = list(filter(None, t))  # Remove empty strings
     cfg = Config(t)
@@ -33,8 +33,9 @@ def fetch_df(c, stats_or_output):
         for k, v in td.items():
             df.loc[:, k] = v
         if df.shape[0] > 1 and stats_or_output == 'output':
-            # Trim to the first computed output
-            df = df.iloc[:1]
+            if not aggregate_all_output:
+                # Trim to the first computed output
+                df = df.iloc[:1]
         return df
     else:
         return None
@@ -43,10 +44,10 @@ def fetch_df(c, stats_or_output):
 class AggregateResults:
 
     @classmethod
-    def read_data(cls, stats_or_output='output'):
+    def read_data(cls, stats_or_output='output', aggregate_all_output=False):
         variants = list(TASKS[0][3].keys())
         tasks = [(t[1].split("train.py ")[1].split(" "), t[3]) for t in TASKS]
-        fetch_function = partial(fetch_df, stats_or_output=stats_or_output)
+        fetch_function = partial(fetch_df, stats_or_output=stats_or_output, aggregate_all_output=aggregate_all_output)
         dfl = list(map(fetch_function, tqdm(tasks)))
         dfl = Util.not_none(dfl)
         df = pd.concat(dfl, sort=True).reindex()
@@ -64,8 +65,8 @@ class AggregateResults:
                 f.write(cfg.stats_file_name() + "\n")
 
     @classmethod
-    def main(cls, stats_or_output='output'):
-        df, bl_variants = cls.read_data(stats_or_output=stats_or_output)
+    def main(cls, stats_or_output='output', aggregate_all_output=False):
+        df, bl_variants = cls.read_data(stats_or_output=stats_or_output, aggregate_all_output=aggregate_all_output)
         # Sanity check
         # if stats_or_output == "output":
         #     check = (df.epoch == 999)

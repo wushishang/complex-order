@@ -16,7 +16,7 @@ from configs.transformer_config import TransformerArgParser
 from my_common.my_helper import enum_sprint, is_positive_int
 # from scalings import Scalings
 from util.constants import TC_ExperimentData, TC_ModelType, Constants, MaxSenLen, RegRepresentation, Regularization, \
-    InputType, ModelType
+    InputType, ModelType, SentenceOrdering
 
 RESULT_DIR = "./results/"
 MODEL_DIR = "./model_save/"
@@ -196,9 +196,14 @@ class Config:
 #                             help='Run reg phase first followed by unreg phase (default: pull-up)')
 #         parser.add_argument('--milestone', type=int, help='Epoch of phase changing.')
 #
-#         ##########
-#         # PARAMETERS THAT CONTROL TESTING
-#         ##########
+        ##########
+        # PARAMETERS THAT CONTROL TESTING
+        ##########
+        parser.add_argument('-to', '--testing_ordering', type=str,
+                            help='Type of ordering applied to testing data (for OOD extrapolation)', default='id')
+        parser.add_argument('-tss', '--testing_shuffle_seed', default=1, type=int,
+                            help='Seed value for shuffling sentences when testing_ordering is random.')
+
 #         parser.add_argument('--testing', action='store_true', default=False,
 #                             help='Do evaluation for the specified trained model on testing data')
 #         parser.add_argument('-tchk', '--test_checkpoint_id', default=None, type=str,
@@ -465,9 +470,12 @@ class Config:
 #             assert self.milestone > 0, "Milestone epoch of two-phase regularization must be a positive integer."
 #             assert self.milestone < self.num_epochs, "Milestone epoch should be smaller than the total number of training epochs."
 #
-#         # ===================================================
-#         # Parameters that control testing
-#         # ===================================================
+        # ===================================================
+        # Parameters that control testing
+        # ===================================================
+        self.testing_ordering = SentenceOrdering[args.testing_ordering.lower()]
+        self.testing_shuffle_seed = args.testing_shuffle_seed
+        assert is_positive_int(self.testing_shuffle_seed)
 #         self.testing = args.testing
 #         self.test_checkpoint_id = args.test_checkpoint_id
 #         self.test_add_train_set = args.test_add_train_set
