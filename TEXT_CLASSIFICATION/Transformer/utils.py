@@ -58,17 +58,20 @@ class Dataset(object):
 
         NLP = spacy.load('en_core_web_sm')
         tokenizer = lambda sent: [x.text for x in NLP.tokenizer(sent) if x.text != " "]
-        TEXT = data.Field(sequential=True, tokenize=tokenizer, lower=True, fix_length=self.config.max_sen_len, include_lengths=True)
+        TEXT = data.Field(sequential=True, tokenize=tokenizer, lower=True, fix_length=self.config.max_sen_len,
+                          include_lengths=True, pad_first=self.config.training_ordering==SentenceOrdering.pad_first)
         LABEL = data.Field(sequential=False, use_vocab=False)
         datafields = [("text",TEXT),("label",LABEL)]
         
         train_df = self.get_pandas_df(train_file)
         train_examples = [data.Example.fromlist(i, datafields) for i in train_df.values.tolist()]
         train_data = data.Dataset(train_examples, datafields)
+        order_sentences(train_data, self.config, 'train')
 
         val_df = self.get_pandas_df(val_file)
         val_examples = [data.Example.fromlist(i, datafields) for i in val_df.values.tolist()]
         val_data = data.Dataset(val_examples, datafields)
+        order_sentences(val_data, self.config, 'train')
 
 
         TEXT.build_vocab(train_data)
@@ -100,7 +103,7 @@ class Dataset(object):
             test_datafields = datafields
         test_examples = [data.Example.fromlist(i, test_datafields) for i in test_df.values.tolist()]
         test_data = data.Dataset(test_examples, test_datafields)
-        order_test(test_data, self.config)
+        order_sentences(test_data, self.config)
         self.test_iterator= data.BucketIterator(
             test_data,
             batch_size=self.config.batch_size,
@@ -237,20 +240,28 @@ def get_pe_variance(pe, original_mode=False, max_len=None):
 
     return pe_var, norm
 
-def order_test(dataset, cfg: Config):
+def order_sentences(dataset, cfg: Config, mode='test'):
     assert isinstance(dataset, data.dataset.Dataset) and isinstance(cfg, Config)
-    assert hasattr(cfg, 'testing_ordering')
-    if cfg.testing_ordering == SentenceOrdering.random:
+    if mode == 'test':
+        assert hasattr(cfg, 'testing_ordering')
+        ordering = cfg.testing_ordering
+        shuffle_seed = cfg.testing_shuffle_seed
+    else:
+        assert mode == 'train' and hasattr(cfg, 'training_ordering')
+        ordering = cfg.training_ordering
+        shuffle_seed = cfg.training_shuffle_seed
+
+    if ordering == SentenceOrdering.random:
         for sentence in dataset.examples:
-            random.Random(cfg.testing_shuffle_seed).shuffle(sentence.text)
-    elif cfg.testing_ordering == SentenceOrdering.sort_up:
+            random.Random(shuffle_seed).shuffle(sentence.text)
+    elif ordering == SentenceOrdering.sort_up:
         for sentence in dataset.examples:
             sentence.text.sort()
-    elif cfg.testing_ordering == SentenceOrdering.sort_down:
+    elif ordering == SentenceOrdering.sort_down:
         for sentence in dataset.examples:
             sentence.text.sort(reverse=True)
-    elif cfg.testing_ordering == SentenceOrdering.reverse:
+    elif ordering == SentenceOrdering.reverse:
         for sentence in dataset.examples:
             sentence.text.reverse()
     else:
-        assert cfg.testing_ordering in (SentenceOrdering.id, SentenceOrdering.pad_first)
+        assert ordering in (SentenceOrdering.id, SentenceOrdering.pad_first)

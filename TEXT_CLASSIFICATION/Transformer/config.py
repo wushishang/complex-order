@@ -50,6 +50,11 @@ class Config:
                             help=f'Data for experiment: {enum_sprint(TC_ExperimentData)}')
         parser.add_argument('-msl', '--max_sen_len', default=0, type=int,
                             help='Maximum length of sentences')
+        parser.add_argument('-tro', '--training_ordering', type=str,
+                            help='Type of ordering applied to training data', default='id')
+        parser.add_argument('-trss', '--training_shuffle_seed', default=2, type=int,
+                            help='Seed value for shuffling sentences when training_ordering is random.')
+
         parser.add_argument('--n_fold', type=int, default=0, help='Number of cv folds for evaluating models on '
                                                                    'CR, MPQA, MR and SUBJ.')
         parser.add_argument('-ix', '--cv_fold', type=int, help='Which fold in cross-validation (e.g., 0 thru 9)')
@@ -58,7 +63,7 @@ class Config:
                             help="Skip data processing (CV splitting) for CR, MPQA, MR or SUBJ.")
         parser.add_argument('--dont_shuffle', default=False, action="store_const", const=True,
                             help="Turn off shuffling each class' samples before splitting")
-        parser.add_argument('--shuffle_random_state', default=1, type=int,
+        parser.add_argument('--shuffle_random_state', default=1337, type=int,
                             help='random_state affects the ordering of the indices if shuffle is True. '
                                  'Turned off if --dont_shuffle is passed')
 
@@ -78,7 +83,7 @@ class Config:
                             help='Number of epochs for training at a maximum')
         parser.add_argument('-pi', '--patience_increase', default=100, type=int,
                             help='Number of epochs to increase patience')
-        parser.add_argument('-lrl', '--lr_reduction_limit', default=2, type=int,
+        parser.add_argument('-lrrl', '--lr_reduction_limit', default=2, type=int,
                             help='Maximum number of learning rate reduction (when a metric has stopped improving)')
         parser.add_argument('-lrrf', '--lr_reduction_factor', default=0.5, type=float,
                             help='Factor by which the learning rate will be reduced')
@@ -208,9 +213,9 @@ class Config:
         ##########
         # PARAMETERS THAT CONTROL TESTING
         ##########
-        parser.add_argument('-to', '--testing_ordering', type=str,
+        parser.add_argument('-teo', '--testing_ordering', type=str,
                             help='Type of ordering applied to testing data (for OOD extrapolation)', default='id')
-        parser.add_argument('-tss', '--testing_shuffle_seed', default=1, type=int,
+        parser.add_argument('-tess', '--testing_shuffle_seed', default=1, type=int,
                             help='Seed value for shuffling sentences when testing_ordering is random.')
 
 #         parser.add_argument('--testing', action='store_true', default=False,
@@ -236,6 +241,10 @@ class Config:
         elif args.max_sen_len == 0:
             self.max_sen_len = MaxSenLen[self.experiment_data]
             print_stats(f"Specified max_sen_len is 0. Reset to max_sen_len of training samples of {self.experiment_data.name}.")
+
+        self.training_ordering = SentenceOrdering[args.training_ordering.lower()]
+        self.training_shuffle_seed = args.training_shuffle_seed
+        assert is_positive_int(self.training_shuffle_seed)
 
         self.n_fold = args.n_fold
         if self.n_fold > 0:
@@ -638,6 +647,11 @@ class Config:
         #                 self.data_cfg.scale_target, self.data_cfg.balance_target]
         if self.shuffle:
             data_params += [self.shuffle_random_state]
+
+        if self.training_ordering != SentenceOrdering.id:
+            data_params += [self.training_ordering.name]
+            if self.training_ordering == SentenceOrdering.random:
+                data_params += [self.training_shuffle_seed]
 
         return data_params
 
