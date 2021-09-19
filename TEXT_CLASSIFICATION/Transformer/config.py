@@ -43,8 +43,6 @@ class Config:
         # ##########
         parser.add_argument('-it', '--input_type', type=str, required=True,
                             help=f'Type of input. One of: {enum_sprint(InputType)}')
-        # parser.add_argument('-ix', '--cv_fold', type=int, help='Which fold in cross-validation (e.g., 0 thru 5)',
-        #                     required=True)
         # parser.add_argument('--train_all', default=False, action='store_true',
         #                     help='If set, model will be trained on both training and validation data')
 
@@ -52,6 +50,17 @@ class Config:
                             help=f'Data for experiment: {enum_sprint(TC_ExperimentData)}')
         parser.add_argument('-msl', '--max_sen_len', default=0, type=int,
                             help='Maximum length of sentences')
+        parser.add_argument('--n_fold', type=int, default=0, help='Number of cv folds for evaluating models on '
+                                                                   'CR, MPQA, MR and SUBJ.')
+        parser.add_argument('-ix', '--cv_fold', type=int, help='Which fold in cross-validation (e.g., 0 thru 9)')
+
+        parser.add_argument('--process_data', default=False, action="store_const", const=True,
+                            help="Skip data processing (CV splitting) for CR, MPQA, MR or SUBJ.")
+        parser.add_argument('--dont_shuffle', default=False, action="store_const", const=True,
+                            help="Turn off shuffling each class' samples before splitting")
+        parser.add_argument('--shuffle_random_state', default=1, type=int,
+                            help='random_state affects the ordering of the indices if shuffle is True. '
+                                 'Turned off if --dont_shuffle is passed')
 
         ##########
         # PARAMETERS FOR MODEL
@@ -228,6 +237,34 @@ class Config:
             self.max_sen_len = MaxSenLen[self.experiment_data]
             print_stats(f"Specified max_sen_len is 0. Reset to max_sen_len of training samples of {self.experiment_data.name}.")
 
+        self.n_fold = args.n_fold
+        if self.n_fold > 0:
+            assert self.experiment_data in (TC_ExperimentData.cr, TC_ExperimentData.mpqa,
+                                            TC_ExperimentData.mr, TC_ExperimentData.subj)
+        elif self.n_fold == 0:
+            assert self.experiment_data in (TC_ExperimentData.TREC_transformer, TC_ExperimentData.sst2_transformer)
+        else:
+            raise ValueError("Number of folds must be non-negative.")
+
+        self.process_data = args.process_data
+        if self.process_data:
+            assert self.experiment_data in (TC_ExperimentData.cr, TC_ExperimentData.mpqa,
+                                            TC_ExperimentData.mr, TC_ExperimentData.subj)
+
+        if self.experiment_data in (TC_ExperimentData.TREC_transformer, TC_ExperimentData.sst2_transformer):
+            self.shuffle = False
+            print_stats("No cross-validation split. Force self.shuffle = False.")
+        else:
+            self.shuffle = not args.dont_shuffle
+
+        self.shuffle_random_state = args.shuffle_random_state
+        if self.shuffle:
+            assert self.shuffle_random_state > 0
+        else:
+            self.shuffle_random_state = None
+            print_stats("Indices will not be shuffled before cross-validation split.")
+
+
         # ===================================================
         # Parameters for data and model types
         # ===================================================
@@ -253,19 +290,17 @@ class Config:
 #             self.model_cfg = self.parsed_to_cfg(args, TransformerArgParser)
         else:
             raise NotImplementedError(f"Haven't implemented {self.model_type} yet.")
-#
-#         # ===================================================
-#         # Parameters for cross-validation
-#         # ===================================================
-#         self.cv_fold = args.cv_fold
-#         if self.data_cfg.experiment_data not in (ExperimentData.br, ExperimentData.zinc):
-#             assert 0 <= self.cv_fold
-#         else:
-#             assert -1 <= self.cv_fold  # -1 indicates the testing set
-#         if self.data_cfg.experiment_data == ExperimentData.rp_paper:
-#             assert self.cv_fold < 5  # While we load the rp_paper data, user may enter n_splits other than 5
-#         else:
-#             assert self.cv_fold < self.data_cfg.n_splits
+
+        # ===================================================
+        # Parameters for cross-validation
+        # ===================================================
+        self.cv_fold = args.cv_fold
+        if self.cv_fold is not None:
+            assert 0 <= self.cv_fold
+            if self.n_fold == 0:
+                assert self.cv_fold == 0
+        else:
+            assert self.n_fold == 0
 #
 #         self.train_all = args.train_all
 #
@@ -594,12 +629,15 @@ class Config:
         """
         Return Data Information
         """
-        data_params = [self.input_type.name, self.experiment_data.name, self.max_sen_len]  # self.cv_fold
+        data_params = [self.input_type.name, self.experiment_data.name, self.max_sen_len]
+
+        if self.n_fold > 0:
+            data_params += [self.n_fold, self.cv_fold]
 
         # data_params += [self.data_id, self.data_cfg.n_splits, self.data_cfg.use_default_train_val_split,
         #                 self.data_cfg.scale_target, self.data_cfg.balance_target]
-        # if self.data_cfg.shuffle :
-        #     data_params += [self.data_cfg.shuffle_random_state]
+        if self.shuffle:
+            data_params += [self.shuffle_random_state]
 
         return data_params
 

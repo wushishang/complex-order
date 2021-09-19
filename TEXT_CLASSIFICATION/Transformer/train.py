@@ -286,15 +286,8 @@ class Train:
         epoch_stats = JsonDump(cfg.stats_file_name())
         output_stats = JsonDump(cfg.output_file_name())
 
-        if cfg.experiment_data in (TC_ExperimentData.TREC_transformer, TC_ExperimentData.sst2_transformer):
-            _, best_model = cls.dev_point_wise(cfg, logger_stats, epoch_stats)
-            cls.test_point_wise(best_model, cfg, logger_stats, output_stats)
-        else:
-            acc_flod = []
-            for i in range(1, cfg.n_fold + 1):
-                print("{} cross validation ".format(i))
-                acc_flod.append(cls.dev_point_wise(cfg, logger_stats, epoch_stats)[0])
-            print("the average acc {}".format(np.mean(acc_flod)))
+        _, best_model = cls.dev_point_wise(cfg, logger_stats, epoch_stats)
+        cls.test_point_wise(best_model, cfg, logger_stats, output_stats)
 
 if __name__ == '__main__':
     Train.main()
