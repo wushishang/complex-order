@@ -21,12 +21,13 @@ from common.torch_util import TorchUtil as tu
 
 class PositionalEncoding(nn.Module):
     "Implement the PE function."
-    def __init__(self, d_model, dropout, max_len, original_mode=False, small_pe=False):
+    def __init__(self, d_model, dropout, max_len, original_mode=False, small_pe=False, dropout_input=True):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
         self.d_model = d_model
         self.original_mode = original_mode
         self.small_pe = small_pe
+        self.dropout_input = dropout_input
         if self.original_mode:
             pe = torch.randn(Constants.ORIGINAL_MAX_PE_LEN, d_model)
             pe = pe.unsqueeze(0)
@@ -38,6 +39,7 @@ class PositionalEncoding(nn.Module):
     def forward(self, x, pe=None):
         if self.original_mode:
             x = x + Variable(self.pe[:, :x.size(1)], requires_grad=False)
+            return self.dropout(x), pe
         else:
             if pe is None:  # normal forward pass (training/evaluating pass); regularization pass if pe is provided
                 assert int(x.size(1)) == len(self.positions)
@@ -47,7 +49,11 @@ class PositionalEncoding(nn.Module):
                     x = torch.add(x, pe)
             else:
                 x = torch.add(x, pe)
-        return self.dropout(x), pe
+
+            if self.dropout_input:
+                return self.dropout(x), pe
+            else:
+                return x, pe
 
 class Transformer_PE_real(nn.Module):
     def __init__(self, config, src_vocab, max_len=5000):
@@ -65,7 +71,8 @@ class Transformer_PE_real(nn.Module):
         if self.PE_type == PE_Type.ape:
             position = PositionalEncoding(d_model, dropout, max_len=max_len,
                                           original_mode=config.original_mode,
-                                          small_pe=config.model_cfg.trans_small_pe)
+                                          small_pe=config.model_cfg.trans_small_pe,
+                                          dropout_input=config.model_cfg.trans_dropout_input)
             self.input_embed = deepcopy(position)
         elif self.PE_type == PE_Type.none:
             pass

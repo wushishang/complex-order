@@ -300,6 +300,9 @@ class Config:
         else:
             raise NotImplementedError(f"Haven't implemented {self.model_type} yet.")
 
+        if self.original_mode:
+            assert self.model_cfg.trans_dropout_input
+
         # ===================================================
         # Parameters for cross-validation
         # ===================================================
