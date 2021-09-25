@@ -180,6 +180,7 @@ class Train:
         #       4. Add regularization
         #       5. Add different orderings for testing
         #       6. Implement patience (finished)
+        #       7. Add evaluation of training and validation at the last epoch
 
         log_stats(logger_stats, "---------Training Model---------", model=model, optimizer=optimizer)
         while patience - epoch >= 1:
@@ -267,7 +268,8 @@ class Train:
         dataset = cls.get_data(cfg, logger_stats)
         test_acc = evaluate_model(best_model, dataset.test_iterator, not cfg.original_mode)
         print(f'Final Test Accuracy: {test_acc}; Testing ordering: {cfg.testing_ordering.name}')
-        _es_test = {'test_acc': test_acc, 'test_order': cfg.testing_ordering}
+        best_val_acc = evaluate_model(best_model, dataset.val_iterator, not cfg.original_mode)
+        _es_test = {'test_acc': test_acc, 'test_order': cfg.testing_ordering, 'val_acc': best_val_acc}
         if cfg.testing_ordering == SentenceOrdering.random:
             _es_test['test_shuffle_seed'] = cfg.testing_shuffle_seed
         if cfg.model_cfg.trans_pe_type == PE_Type.ape:
