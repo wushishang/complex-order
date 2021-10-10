@@ -523,6 +523,8 @@ class Config:
         self.testing_ordering = SentenceOrdering[args.testing_ordering.lower()]
         self.testing_shuffle_seed = args.testing_shuffle_seed
         assert is_positive_int(self.testing_shuffle_seed)
+        if self.model_type == TC_ModelType.transformer and self.model_cfg.trans_mask_padding:
+            assert self.testing_ordering != SentenceOrdering.pad_first
 #         self.testing = args.testing
 #         self.test_checkpoint_id = args.test_checkpoint_id
 #         self.test_add_train_set = args.test_add_train_set

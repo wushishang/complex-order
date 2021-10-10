@@ -61,7 +61,7 @@ class PositionalEncoding(nn.Module):
 class PoolingFunction:
 
     @classmethod
-    def get_pool_func(self, pool):
+    def get_pool_func(self, pool, dim=1):
         """
         Return the corresponding torch activation function given its name
 
@@ -70,20 +70,23 @@ class PoolingFunction:
         """
         assert isinstance(pool, Pooling)
         if pool == Pooling.last_dim:  # Used in complex-order paper
-            return self.last_dim
+            return partial(self.last_dim, dim=dim)
         elif pool == Pooling.sum:
-            return partial(torch.sum, dim=1)
+            return partial(torch.sum, dim=dim)
         elif pool == Pooling.max:
-            return self.max_pooling
+            return partial(self.max_pooling, dim=dim)
         elif pool == Pooling.mean:
-            return partial(torch.mean, dim=1)
+            return partial(torch.mean, dim=dim)
         else:
             raise NotImplementedError(f"Haven't yet implemented models with {pool.name} pooling.")
 
     @staticmethod
-    def last_dim(x):
-        return x[:,-1,:]
+    def last_dim(x, dim=1):
+        if dim == 1:
+            return x[:,-1,:]
+        else:
+            return x[-1,:]
 
     @staticmethod
-    def max_pooling(x):
-        return torch.max(x, dim=1)[0]
+    def max_pooling(x, dim=1):
+        return torch.max(x, dim=dim)[0]

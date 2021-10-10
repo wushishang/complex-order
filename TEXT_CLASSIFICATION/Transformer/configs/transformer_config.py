@@ -45,7 +45,9 @@ class TransformerArgParser(ModelArgParser):
                            default=0.1,
                            help="Dropout probability")
         group.add_argument('--trans_dont_dropout_input', default=False, action='store_true',
-                           help="Don't dropout input, i.e., word embedding + PE (Default: True).")
+                           help="Don't dropout input, i.e., word embedding + PE.")
+        group.add_argument('--trans_dont_mask_padding', default=False, action='store_true',
+                           help="Don't mask padding.")
         # Layer Normalization (using default from the 'complex order' paper)
         # FIXME: this argument takes no effect right now
         group.add_argument('--trans_dont_use_layer_norm', default=False, action='store_true',
@@ -70,6 +72,7 @@ class TransformerArgParser(ModelArgParser):
         self.trans_num_heads = args.trans_num_heads
         self.trans_dropout = args.trans_dropout
         self.trans_dropout_input = not args.trans_dont_dropout_input
+        self.trans_mask_padding = not args.trans_dont_mask_padding
         self.trans_layer_norm = not args.trans_dont_use_layer_norm
         if not self.trans_layer_norm:
             raise NotImplementedError("We haven't implemented Transformer w/o LayerNorm.")
@@ -77,7 +80,7 @@ class TransformerArgParser(ModelArgParser):
         for _var in [self.trans_num_layers, self.trans_dim_model, self.trans_dim_ff, self.trans_num_heads]:
             assert is_positive_int(_var)
         assert isinstance(self.trans_dropout, float) and self.trans_dropout >= 0
-        for _var in [self.trans_dropout_input, self.trans_layer_norm]:
+        for _var in [self.trans_dropout_input, self.trans_layer_norm, self.trans_mask_padding]:
             assert isinstance(_var, bool)
         if self.trans_small_pe:
             assert self.trans_pe_type != PE_Type.none
@@ -86,7 +89,7 @@ class TransformerArgParser(ModelArgParser):
     def get_model_id_list(self):
         _lst = [self.trans_pe_type.name, self.trans_small_pe, self.trans_pooling.name, self.trans_num_layers,
                 self.trans_dim_model, self.trans_dim_ff, self.trans_num_heads, self.trans_dropout, self.trans_dropout_input,
-                self.trans_layer_norm]
+                self.trans_mask_padding, self.trans_layer_norm]
 
         return self.add_additional_id_info(_lst)
 

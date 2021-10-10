@@ -17,6 +17,7 @@ from torch.autograd import Variable
 from util.constants import TC_OutputSize, Constants, PE_Type, RegRepresentation, Regularization
 from utils import *
 from common.torch_util import TorchUtil as tu
+from my_common.my_helper import is_tensor
 
 
 class PositionalEncoding(nn.Module):
@@ -58,6 +59,8 @@ class PositionalEncoding(nn.Module):
 class Transformer_PE_real(nn.Module):
     def __init__(self, config, src_vocab, max_len=5000):
         super(Transformer_PE_real, self).__init__()
+
+        self.mask_padding = config.model_cfg.trans_mask_padding
         
         h, N, dropout = config.model_cfg.trans_num_heads, config.model_cfg.trans_num_layers, config.model_cfg.trans_dropout
         d_model, d_ff = config.model_cfg.trans_dim_model, config.model_cfg.trans_dim_ff
@@ -87,13 +90,19 @@ class Transformer_PE_real(nn.Module):
             int(TC_OutputSize[config.experiment_data])
         )
 
-        self.pool = PoolingFunction.get_pool_func(config.model_cfg.trans_pooling)
+        self.pool = PoolingFunction.get_pool_func(config.model_cfg.trans_pooling, dim=0 if self.mask_padding else 1)
         self.softmax = nn.Softmax(dim=1)
 
         self.max_epochs = config.num_epochs
         self.original_mode = config.original_mode
 
-    def forward(self, x, pe=None):
+    def forward(self, x, pe=None, sen_len=None):
+        if self.mask_padding:
+            assert sen_len is not None
+            mask = self.generate_padding_mask(sen_len, x.shape[0])
+        else:
+            mask = None
+
         if x.dim() == 2:  # forward pass
             x = self.token_embed(x.permute(1, 0))
         else:
@@ -104,10 +113,18 @@ class Transformer_PE_real(nn.Module):
         else:
             assert pe is None
             embedded_sents = x
-        encoded_sents = self.encoder(embedded_sents)
+        encoded_sents = self.encoder(embedded_sents, mask)
 
         assert encoded_sents.ndim == 3
-        final_feature_map = self.pool(encoded_sents)
+        if self.mask_padding:
+            fml = []
+            for idx, ss in enumerate(encoded_sents):
+                sen_l = sen_len[idx]
+                fm = self.pool(ss[:sen_l])
+                fml.append(fm)
+            final_feature_map = torch.stack(fml)
+        else:
+            final_feature_map = self.pool(encoded_sents)
         final_out = self.fc(final_feature_map)
         return final_out, final_feature_map, embedded_sents, pe
 
@@ -189,8 +206,8 @@ class Transformer_PE_real(nn.Module):
         """
         return overall_loss.mean(), breg_penalty.mean()
 
-    def predict(self, x, pe=None):
-        return self.__call__(x, pe)[0]
+    def predict(self, x, pe=None, sen_len=None):
+        return self.__call__(x, pe, sen_len)[0]
                 
     def run_epoch(self, train_iterator, optimizer, track_latent_norm=False):
         overall_losses = []
@@ -209,11 +226,13 @@ class Transformer_PE_real(nn.Module):
             optimizer.zero_grad()
             if torch.cuda.is_available():
                 x = batch.text[0].cuda()
+                sen_len = batch.text[1].cuda()
                 y = (batch.label - 1).type(torch.cuda.LongTensor)
             else:
                 x = batch.text[0]
+                sen_len = batch.text[1]
                 y = (batch.label - 1).type(torch.LongTensor)
-            prediction, latent, embedded_sents, positional_encodings = self.__call__(x)
+            prediction, latent, embedded_sents, positional_encodings = self.__call__(x, sen_len=sen_len)
             train_loss = self.loss_op(self.softmax(prediction), y)
             overall_loss, breg_penalty = self.penalty(prediction, latent, train_loss,  # track_latent_norm,
                                                       sets=embedded_sents, positional_encodings=positional_encodings)
@@ -230,3 +249,15 @@ class Transformer_PE_real(nn.Module):
 
         return overall_losses, train_losses, breg_penalties  #, latent_penalties, stats
         # return train_losses, val_accuracies
+
+
+    def generate_padding_mask(self, sen_len, max_len):
+        # Generate mask for padding with broadcasting trick. Assume post padding.
+        # Ref: http://juditacs.github.io/2018/12/27/masked-attention.html
+        assert is_tensor(sen_len) and sen_len.dim()==1 and len(sen_len) > 0
+        assert is_positive_int(max_len)
+
+        mask = torch.arange(max_len)[None, :] < sen_len[:, None]
+        mask = mask.type(torch.LongTensor)
+        mask = tu.move(mask.repeat_interleave(max_len, dim=0))
+        return mask.view(len(sen_len), max_len, max_len)
