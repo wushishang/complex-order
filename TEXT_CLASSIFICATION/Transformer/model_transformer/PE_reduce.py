@@ -37,7 +37,7 @@ class PositionalEncoding(nn.Module):
             self.pe = nn.Embedding(max_len, d_model)
             self.positions = tu.move(torch.arange(max_len))
         
-    def forward(self, x, pe=None):
+    def forward(self, x, pe=None, expand_pe=False):
         if self.original_mode:
             x = x + Variable(self.pe[:, :x.size(1)], requires_grad=False)
             return self.dropout(x), pe
@@ -47,14 +47,15 @@ class PositionalEncoding(nn.Module):
                 pe = self.pe(self.positions)
                 if not self.small_pe:
                     pe = pe * math.sqrt(self.d_model)
-                    x = torch.add(x, pe)
-            else:
-                x = torch.add(x, pe)
+                if expand_pe:
+                    pe = pe.expand(x.shape[0], -1, -1)
+
+            embedded_sents = torch.add(x, pe)
 
             if self.dropout_input:
-                return self.dropout(x), pe
+                return self.dropout(embedded_sents), pe
             else:
-                return x, pe
+                return embedded_sents, pe
 
 class Transformer_PE_real(nn.Module):
     def __init__(self, config, src_vocab, max_len=5000):
@@ -109,7 +110,7 @@ class Transformer_PE_real(nn.Module):
             assert x.dim() == 3  # regularization pass
 
         if self.PE_type == PE_Type.ape:
-            embedded_sents, pe = self.input_embed(x, pe)
+            embedded_sents, pe = self.input_embed(x, pe, expand_pe=self.mask_padding)
         else:
             assert pe is None
             embedded_sents = x
@@ -126,7 +127,7 @@ class Transformer_PE_real(nn.Module):
         else:
             final_feature_map = self.pool(encoded_sents)
         final_out = self.fc(final_feature_map)
-        return final_out, final_feature_map, embedded_sents, pe
+        return final_out, final_feature_map, x, pe
 
     def add_regularizer(self, regularizer: JpRegularizer):
         self.regularizer = regularizer
@@ -231,10 +232,11 @@ class Transformer_PE_real(nn.Module):
                 x = batch.text[0]
                 y = (batch.label - 1).type(torch.LongTensor)
             sen_len = batch.text[1]
-            prediction, latent, embedded_sents, positional_encodings = self.__call__(x, sen_len=sen_len)
+            prediction, latent, x, positional_encodings = self.__call__(x, sen_len=sen_len)
             train_loss = self.loss_op(self.softmax(prediction), y)
             overall_loss, breg_penalty = self.penalty(prediction, latent, train_loss,  # track_latent_norm,
-                                                      sets=embedded_sents, positional_encodings=positional_encodings)
+                                                      sets=x, positional_encodings=positional_encodings,
+                                                      n_vert_list=sen_len if self.mask_padding else None)
             overall_loss, breg_penalty = self.mean_reduction(overall_loss, breg_penalty)
             overall_loss.backward()
             overall_losses.append(overall_loss.item())

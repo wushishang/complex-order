@@ -44,7 +44,9 @@ class FiniteDifferences:
         if permute_range is None:
             permute_range = seqlen
         else:
-            assert isinstance(permute_range, int) and 1 < permute_range <= seqlen
+            assert isinstance(permute_range, int) and 1 <= permute_range <= seqlen
+            if permute_range == 1:
+                return torch.eye(seqlen)
 
         assert isinstance(random_segment, bool)
         if random_segment:
@@ -253,10 +255,18 @@ class JpRegularizer:
 
         else:  # sets
             if self.permute_positional_encoding:
-                assert positional_encodings is not None and positional_encodings.dim() == 2
-                seq_len = positional_encodings.shape[0]  # Assume same set sizes when positional encoding is in use
-                if not self.tangent_prop:  # both sets and positional_encodings are required to compute finite diff
+                assert positional_encodings is not None and positional_encodings.dim() in (2, 3)
+                if positional_encodings.dim() == 2:
+                    seq_len = positional_encodings.shape[0]  # Assume same set sizes when positional encoding is in use
+                else:
+                    # (Onehot ID's) or APE w/ variable sentence lengths
+                    seq_len = positional_encodings.shape[1]
+                if not self.tangent_prop:  # both (embedded) sets and positional_encodings are required to compute finite diff
                     assert sets is not None and positional_encodings.shape == sets[0].shape
+                    if positional_encodings.dim() == 3:
+                        assert positional_encodings.shape == sets.shape
+                    else:
+                        assert positional_encodings.shape == sets[0].shape
             else:
                 assert sets is not None
                 seq_len = sets[0].shape[0]  # Currently assume same sizes (simplicity)
