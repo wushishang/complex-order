@@ -226,12 +226,11 @@ class Transformer_PE_real(nn.Module):
             optimizer.zero_grad()
             if torch.cuda.is_available():
                 x = batch.text[0].cuda()
-                sen_len = batch.text[1].cuda()
                 y = (batch.label - 1).type(torch.cuda.LongTensor)
             else:
                 x = batch.text[0]
-                sen_len = batch.text[1]
                 y = (batch.label - 1).type(torch.LongTensor)
+            sen_len = batch.text[1]
             prediction, latent, embedded_sents, positional_encodings = self.__call__(x, sen_len=sen_len)
             train_loss = self.loss_op(self.softmax(prediction), y)
             overall_loss, breg_penalty = self.penalty(prediction, latent, train_loss,  # track_latent_norm,

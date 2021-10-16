@@ -76,7 +76,9 @@ class TransformerArgParser(ModelArgParser):
         self.trans_layer_norm = not args.trans_dont_use_layer_norm
         if not self.trans_layer_norm:
             raise NotImplementedError("We haven't implemented Transformer w/o LayerNorm.")
-
+        if self.trans_dropout == 0.:
+            assert self.trans_dropout_input == True, "Non-default value of args.trans_dont_dropout_input is specified, " \
+                                                     "but dropout is zero."
         for _var in [self.trans_num_layers, self.trans_dim_model, self.trans_dim_ff, self.trans_num_heads]:
             assert is_positive_int(_var)
         assert isinstance(self.trans_dropout, float) and self.trans_dropout >= 0
@@ -88,8 +90,10 @@ class TransformerArgParser(ModelArgParser):
 
     def get_model_id_list(self):
         _lst = [self.trans_pe_type.name, self.trans_small_pe, self.trans_pooling.name, self.trans_num_layers,
-                self.trans_dim_model, self.trans_dim_ff, self.trans_num_heads, self.trans_dropout, self.trans_dropout_input,
-                self.trans_mask_padding, self.trans_layer_norm]
+                self.trans_dim_model, self.trans_dim_ff, self.trans_num_heads, self.trans_dropout]
+        if self.trans_dropout > 0.:
+            _lst += [self.trans_dropout_input]
+        _lst += [self.trans_mask_padding, self.trans_layer_norm]
 
         return self.add_additional_id_info(_lst)
 
